@@ -1,26 +1,23 @@
 <?php
-// This script is run from the PHP container at startup:
-// command: sh -c "php src/Config/Init.php && php-fpm"
+// This script is run from the PHP container at startup.
 
 require __DIR__ . '/../../vendor/autoload.php';
+
 use App\Config\Database;
 
-echo "🚀 Running DB initialization...\n";
+echo "Running DB initialization...\n";
 
 $pdo = Database::getConnection();
 
-// --- 2. Create tables if they don't exist ---
-
-echo "🛠 Creating tables if missing...\n";
+echo "Creating tables if missing...\n";
 
 $queries = [
-
     "CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role ENUM('student','admin') NOT NULL DEFAULT 'student',
+        role ENUM('admin','tutor','student') NOT NULL DEFAULT 'student',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
 
@@ -58,74 +55,64 @@ foreach ($queries as $sql) {
     $pdo->exec($sql);
 }
 
-echo "✅ Tables ensured.\n";
+// Keep role enum in sync for existing databases.
+$pdo->exec("
+    ALTER TABLE users
+    MODIFY COLUMN role ENUM('admin','tutor','student') NOT NULL DEFAULT 'student'
+");
 
-// --- 3. Check if already seeded ---
+echo "Tables ensured.\n";
 
 $userCount = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
 
 if ($userCount > 0) {
-    echo "✔ Database already seeded, skipping seeding.\n";
+    echo "Database already seeded, skipping seeding.\n";
     return;
 }
 
-echo "🌱 Seeding initial data...\n";
+echo "Seeding initial data...\n";
 
-// --- 4. Seed data ---
-
-// Users
 $insertUser = $pdo->prepare("
     INSERT INTO users (name, email, password_hash, role)
     VALUES (:name, :email, :password_hash, :role)
 ");
 
 $insertUser->execute([
-    ':name'          => 'Admin User',
-    ':email'         => 'admin@example.com',
+    ':name' => 'Admin User',
+    ':email' => 'admin@example.com',
     ':password_hash' => password_hash('password', PASSWORD_DEFAULT),
-    ':role'          => 'admin',
+    ':role' => 'admin',
 ]);
-$adminId = (int)$pdo->lastInsertId();
 
-$insertUser->execute([
-    ':name'          => 'Test Student',
-    ':email'         => 'student@example.com',
-    ':password_hash' => password_hash('password', PASSWORD_DEFAULT),
-    ':role'          => 'student',
-]);
-$studentId = (int)$pdo->lastInsertId();
-
-// Services
 $insertService = $pdo->prepare("
     INSERT INTO services (title, description, duration_minutes, is_active)
     VALUES (:title, :description, :duration_minutes, :is_active)
 ");
 
 $insertService->execute([
-    ':title'            => 'Mathematics Tutoring',
-    ':description'      => 'Personalized math sessions tailored to your needs.',
+    ':title' => 'Mathematics Tutoring',
+    ':description' => 'Personalized math sessions tailored to your needs.',
     ':duration_minutes' => 60,
-    ':is_active'  => 1,
+    ':is_active' => 1,
 ]);
-$mathId = (int)$pdo->lastInsertId();
+$mathId = (int) $pdo->lastInsertId();
 
 $insertService->execute([
-    ':title'            => 'English Tutoring',
-    ':description'      => 'Grammar, writing, and comprehension help.',
+    ':title' => 'English Tutoring',
+    ':description' => 'Grammar, writing, and comprehension help.',
     ':duration_minutes' => 60,
-    ':is_active'  => 1,
+    ':is_active' => 1,
 ]);
-$englishId = (int)$pdo->lastInsertId();
+$englishId = (int) $pdo->lastInsertId();
 
 $insertService->execute([
-    ':title'            => 'Science Tutoring',
-    ':description'      => 'Support for physics, chemistry, and biology.',
+    ':title' => 'Science Tutoring',
+    ':description' => 'Support for physics, chemistry, and biology.',
     ':duration_minutes' => 60,
-    ':is_active'  => 1,
+    ':is_active' => 1,
 ]);
-$scienceId = (int)$pdo->lastInsertId();
+$scienceId = (int) $pdo->lastInsertId();
 
-// Timeslots 
 $insertSlot = $pdo->prepare("
     INSERT INTO timeslots (service_id, start_time, end_time, is_active)
     VALUES (:service_id, :start_time, :end_time, :is_active)
@@ -134,87 +121,50 @@ $insertSlot = $pdo->prepare("
 $insertSlot->execute([
     ':service_id' => $mathId,
     ':start_time' => date('Y-m-d 10:00:00', strtotime('+1 day')),
-    ':end_time'   => date('Y-m-d 11:00:00', strtotime('+1 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 11:00:00', strtotime('+1 day')),
+    ':is_active' => 1,
 ]);
-$slot1 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $englishId,
     ':start_time' => date('Y-m-d 13:00:00', strtotime('+1 day')),
-    ':end_time'   => date('Y-m-d 14:00:00', strtotime('+1 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 14:00:00', strtotime('+1 day')),
+    ':is_active' => 1,
 ]);
-$slot2 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $scienceId,
     ':start_time' => date('Y-m-d 15:00:00', strtotime('+1 day')),
-    ':end_time'   => date('Y-m-d 16:00:00', strtotime('+1 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 16:00:00', strtotime('+1 day')),
+    ':is_active' => 1,
 ]);
-$slot3 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $mathId,
     ':start_time' => date('Y-m-d 10:00:00', strtotime('-3 day')),
-    ':end_time'   => date('Y-m-d 11:00:00', strtotime('-3 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 11:00:00', strtotime('-3 day')),
+    ':is_active' => 1,
 ]);
-$slot4 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $englishId,
     ':start_time' => date('Y-m-d 13:00:00', strtotime('+2 day')),
-    ':end_time'   => date('Y-m-d 14:00:00', strtotime('+2 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 14:00:00', strtotime('+2 day')),
+    ':is_active' => 1,
 ]);
-$slot5 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $scienceId,
     ':start_time' => date('Y-m-d 15:00:00', strtotime('+7 day')),
-    ':end_time'   => date('Y-m-d 16:00:00', strtotime('+7 day')),
-    ':is_active'  => 1,
+    ':end_time' => date('Y-m-d 16:00:00', strtotime('+7 day')),
+    ':is_active' => 1,
 ]);
-$slot6 = (int)$pdo->lastInsertId();
 
 $insertSlot->execute([
     ':service_id' => $mathId,
     ':start_time' => date('Y-m-d 10:00:00', strtotime('-5 day')),
-    ':end_time'   => date('Y-m-d 11:00:00', strtotime('-5 day')),
-    ':is_active'  => 1,
-]);
-$slot7 = (int)$pdo->lastInsertId();
-
-// Booking for demo student
-$insertBooking = $pdo->prepare("
-    INSERT INTO bookings (student_id, timeslot_id, status)
-    VALUES (:student_id, :timeslot_id, :status)
-");
-
-$insertBooking->execute([
-    ':student_id'  => $studentId,
-    ':timeslot_id' => $slot5, 
-    ':status'      => 'approved',
+    ':end_time' => date('Y-m-d 11:00:00', strtotime('-5 day')),
+    ':is_active' => 1,
 ]);
 
-$insertBooking->execute([
-    ':student_id'  => $studentId,
-    ':timeslot_id' => $slot4, 
-    ':status'      => 'approved',
-]);
-
-$insertBooking->execute([
-    ':student_id'  => $studentId,
-    ':timeslot_id' => $slot7, 
-    ':status'      => 'approved',
-]);
-
-$insertBooking->execute([
-    ':student_id'  => $studentId,
-    ':timeslot_id' => $slot6, 
-    ':status'      => 'pending',
-]);
-
-echo "🎉 Database initialized and seeded!\n";
+echo "Database initialized and seeded.\n";

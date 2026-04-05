@@ -16,14 +16,19 @@ class UserService implements IUserService
         $this->userRepository = new UserRepository();
     }
 
-    public function registerStudent(string $name, string $email, string $password): int
+    public function registerUser(string $name, string $email, string $password, string $role): int
     {
         $name = trim($name);
         $email = strtolower(trim($email));
         $password = (string)$password;
+        $role = strtolower(trim($role));
 
         if ($name === '') {
             throw new \RuntimeException("Name is required.");
+        }
+
+        if ($email === '') {
+            throw new \RuntimeException("Email is required.");
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -34,8 +39,13 @@ class UserService implements IUserService
             throw new \RuntimeException("Password must be at least 6 characters.");
         }
 
-        // Students only
-        $role = 'student';
+        if ($role === '') {
+            throw new \RuntimeException("Role is required.");
+        }
+
+        if (!UserModel::isAllowedRole($role)) {
+            throw new \RuntimeException("Invalid role. Allowed values: tutor, student.");
+        }
 
         // Prevent duplicate email
         if ($this->userRepository->findByEmail($email)) {
