@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+    nginx:
+        image: nginx:latest
+        ports:
+            - "80:80"
+        volumes:
+            - ./nginx.conf:/etc/nginx/nginx.conf
+            - ./app:/app
+    php:
+        build:
+            context: .
+            dockerfile: PHP.Dockerfile
+        volumes:
+            - ./app:/app
+        working_dir: /app
+        depends_on:
+            - mysql
+        command: sh -c "php src/Config/DatabaseSeeder.php && php-fpm"
+    mysql:
+        image: mariadb:latest
+        environment:
+            MYSQL_ROOT_PASSWORD: 'secret123'
+            MYSQL_USER: 'developer'
+            MYSQL_PASSWORD: 'secret123'
+            MYSQL_DATABASE: 'developmentdb'
+        healthcheck:
+          test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -udeveloper -psecret123 --silent"]
+          interval: 3s
+          timeout: 3s
+          retries: 40
+        volumes:
+            - mysqldata:/var/lib/mysql
+        ports:
+            - 3306:3306
+    phpmyadmin:
+        image: phpmyadmin:latest
+        ports:
+            - 8080:80
+        environment:
+            - PMA_HOST=mysql
+volumes:
+    mysqldata: {}
