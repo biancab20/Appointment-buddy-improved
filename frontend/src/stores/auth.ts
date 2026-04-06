@@ -1,14 +1,15 @@
+import axios from 'axios'
 import { computed, ref } from 'vue'
 
 import { defineStore } from 'pinia'
 
-import { api } from '@/lib/api'
-
 export type UserRole = 'admin' | 'tutor' | 'student'
 
-const ACCESS_TOKEN_KEY = 'appointment_buddy_access_token'
-const REFRESH_TOKEN_KEY = 'appointment_buddy_refresh_token'
-const USER_ROLE_KEY = 'appointment_buddy_user_role'
+export const ACCESS_TOKEN_KEY = 'appointment_buddy_access_token'
+export const REFRESH_TOKEN_KEY = 'appointment_buddy_refresh_token'
+export const USER_ROLE_KEY = 'appointment_buddy_user_role'
+
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(localStorage.getItem(ACCESS_TOKEN_KEY))
@@ -48,14 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       if (token) {
-        await api.post(
-          '/auth/logout',
+        await axios.post(
+          `${apiBaseURL}/auth/logout`,
           {
             refresh_token: currentRefreshToken,
           },
           {
             headers: {
               Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
             },
           },
         )
