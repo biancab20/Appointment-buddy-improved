@@ -6,6 +6,8 @@ final class ServiceModel
 {
     public function __construct(
         public ?int $id,
+        public int $tutorId,
+        public ?string $tutorName,
         public string $title,
         public ?string $description,
         public int $durationMinutes,
@@ -18,6 +20,8 @@ final class ServiceModel
     {
         return new self(
             id: isset($row['id']) ? (int)$row['id'] : null,
+            tutorId: (int)($row['tutor_id'] ?? 0),
+            tutorName: isset($row['tutor_name']) ? (string)$row['tutor_name'] : null,
             title: (string)($row['title'] ?? ''),
             description: $row['description'] ?? null,
             durationMinutes: (int)($row['duration_minutes'] ?? 0),
@@ -31,6 +35,8 @@ final class ServiceModel
     {
         return [
             'id' => $this->id,
+            'tutor_id' => $this->tutorId,
+            'tutor_name' => $this->tutorName,
             'title' => $this->title,
             'description' => $this->description,
             'duration_minutes' => $this->durationMinutes,

@@ -5,20 +5,33 @@ namespace App\Services;
 use App\Models\ServiceModel;
 use App\Repositories\ServiceRepository;
 use App\Repositories\Interfaces\IServiceRepository;
+use App\Repositories\Interfaces\IUserRepository;
+use App\Repositories\UserRepository;
 use App\Services\Interfaces\IServiceCatalogService;
 
 class ServiceCatalogService implements IServiceCatalogService
 {
     private IServiceRepository $serviceRepository;
+    private IUserRepository $userRepository;
 
     public function __construct()
     {
         $this->serviceRepository = new ServiceRepository();
+        $this->userRepository = new UserRepository();
     }
 
     public function getAllServices(): array
     {
         return $this->serviceRepository->getAll();
+    }
+
+    public function getServicesByTutorId(int $tutorId): array
+    {
+        if ($tutorId <= 0) {
+            throw new \RuntimeException("Tutor id is required.");
+        }
+
+        return $this->serviceRepository->getAllByTutorId($tutorId);
     }
 
     public function getAllActiveServices(): array
@@ -31,8 +44,22 @@ class ServiceCatalogService implements IServiceCatalogService
         return $this->serviceRepository->find($id);
     }
 
-    public function createService(string $title, ?string $description, int $durationMinutes, float $price): int
-    {
+    public function createService(
+        int $tutorId,
+        string $title,
+        ?string $description,
+        int $durationMinutes,
+        float $price
+    ): int {
+        if ($tutorId <= 0) {
+            throw new \RuntimeException("Tutor id is required.");
+        }
+
+        $tutor = $this->userRepository->findById($tutorId);
+        if (!$tutor || !$tutor->isTutor()) {
+            throw new \RuntimeException("Service owner must be a tutor.");
+        }
+
         $title = trim($title);
         if ($title === '') {
             throw new \RuntimeException("Service title is required.");
@@ -48,6 +75,8 @@ class ServiceCatalogService implements IServiceCatalogService
 
         $service = new ServiceModel(
             id: null,
+            tutorId: $tutorId,
+            tutorName: $tutor->name,
             title: $title,
             description: $description ? trim($description) : null,
             durationMinutes: $durationMinutes,

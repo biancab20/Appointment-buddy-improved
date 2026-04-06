@@ -35,12 +35,15 @@ $queries = [
 
     "CREATE TABLE IF NOT EXISTS services (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tutor_id INT NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         duration_minutes INT NOT NULL,
         price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_services_tutor_id (tutor_id),
+        CONSTRAINT fk_services_tutor_id FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE RESTRICT
     )",
 
     "CREATE TABLE IF NOT EXISTS timeslots (
@@ -95,6 +98,94 @@ $pdo->exec("
     MODIFY COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00
 ");
 
+// Keep services.tutor_id in sync for existing databases.
+$tutorIdColumnExists = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'services'
+      AND COLUMN_NAME = 'tutor_id'
+")->fetchColumn();
+
+if ($tutorIdColumnExists === 0) {
+    $pdo->exec("
+        ALTER TABLE services
+        ADD COLUMN tutor_id INT NULL AFTER id
+    ");
+}
+
+$fallbackOwnerId = (int) $pdo->query("
+    SELECT id
+    FROM users
+    WHERE role = 'tutor'
+    ORDER BY id ASC
+    LIMIT 1
+")->fetchColumn();
+
+if ($fallbackOwnerId <= 0) {
+    $fallbackOwnerId = (int) $pdo->query("
+        SELECT id
+        FROM users
+        ORDER BY id ASC
+        LIMIT 1
+    ")->fetchColumn();
+}
+
+if ($fallbackOwnerId > 0) {
+    $stmt = $pdo->prepare("
+        UPDATE services
+        SET tutor_id = :tutor_id
+        WHERE tutor_id IS NULL
+    ");
+    $stmt->execute([':tutor_id' => $fallbackOwnerId]);
+}
+
+$nullTutorOwnerCount = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM services
+    WHERE tutor_id IS NULL
+")->fetchColumn();
+
+if ($nullTutorOwnerCount === 0) {
+    $pdo->exec("
+        ALTER TABLE services
+        MODIFY COLUMN tutor_id INT NOT NULL
+    ");
+
+    $servicesTutorIndexExists = (int) $pdo->query("
+        SELECT COUNT(*)
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'services'
+          AND INDEX_NAME = 'idx_services_tutor_id'
+    ")->fetchColumn();
+
+    if ($servicesTutorIndexExists === 0) {
+        $pdo->exec("
+            ALTER TABLE services
+            ADD INDEX idx_services_tutor_id (tutor_id)
+        ");
+    }
+
+    $servicesTutorFkExists = (int) $pdo->query("
+        SELECT COUNT(*)
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'services'
+          AND COLUMN_NAME = 'tutor_id'
+          AND REFERENCED_TABLE_NAME = 'users'
+          AND REFERENCED_COLUMN_NAME = 'id'
+    ")->fetchColumn();
+
+    if ($servicesTutorFkExists === 0) {
+        $pdo->exec("
+            ALTER TABLE services
+            ADD CONSTRAINT fk_services_tutor_id
+            FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE RESTRICT
+        ");
+    }
+}
+
 echo "Tables ensured.\n";
 
 $userCount = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
@@ -124,13 +215,15 @@ $insertUser->execute([
     ':password_hash' => password_hash('password', PASSWORD_DEFAULT),
     ':role' => 'tutor',
 ]);
+$tutorId = (int) $pdo->lastInsertId();
 
 $insertService = $pdo->prepare("
-    INSERT INTO services (title, description, duration_minutes, price, is_active)
-    VALUES (:title, :description, :duration_minutes, :price, :is_active)
+    INSERT INTO services (tutor_id, title, description, duration_minutes, price, is_active)
+    VALUES (:tutor_id, :title, :description, :duration_minutes, :price, :is_active)
 ");
 
 $insertService->execute([
+    ':tutor_id' => $tutorId,
     ':title' => 'Mathematics Tutoring',
     ':description' => 'Personalized math sessions tailored to your needs.',
     ':duration_minutes' => 60,
@@ -140,6 +233,7 @@ $insertService->execute([
 $mathId = (int) $pdo->lastInsertId();
 
 $insertService->execute([
+    ':tutor_id' => $tutorId,
     ':title' => 'English Tutoring',
     ':description' => 'Grammar, writing, and comprehension help.',
     ':duration_minutes' => 60,
@@ -149,6 +243,7 @@ $insertService->execute([
 $englishId = (int) $pdo->lastInsertId();
 
 $insertService->execute([
+    ':tutor_id' => $tutorId,
     ':title' => 'Science Tutoring',
     ':description' => 'Support for physics, chemistry, and biology.',
     ':duration_minutes' => 60,

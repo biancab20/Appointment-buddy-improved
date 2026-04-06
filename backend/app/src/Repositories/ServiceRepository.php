@@ -4,7 +4,6 @@ namespace App\Repositories;
 
 use App\Config\Database;
 use App\Models\ServiceModel;
-use App\Models\TimeslotModel;
 use App\Repositories\Interfaces\IServiceRepository;
 use PDO;
 
@@ -15,11 +14,12 @@ class ServiceRepository implements IServiceRepository
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("
-            INSERT INTO services (title, description, duration_minutes, price, is_active)
-            VALUES (:title, :description, :duration_minutes, :price, :is_active)
+            INSERT INTO services (tutor_id, title, description, duration_minutes, price, is_active)
+            VALUES (:tutor_id, :title, :description, :duration_minutes, :price, :is_active)
         ");
 
         $stmt->execute([
+            ':tutor_id' => $service->tutorId,
             ':title' => $service->title,
             ':description' => $service->description,
             ':duration_minutes' => $service->durationMinutes,
@@ -36,7 +36,12 @@ class ServiceRepository implements IServiceRepository
     {
         $pdo = Database::getConnection();
 
-        $stmt = $pdo->query("SELECT * FROM services ORDER BY title ASC");
+        $stmt = $pdo->query("
+            SELECT s.*, u.name AS tutor_name
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            ORDER BY s.title ASC
+        ");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(fn(array $row) => ServiceModel::fromArray($row), $rows);
@@ -48,10 +53,11 @@ class ServiceRepository implements IServiceRepository
         $pdo = Database::getConnection();
 
         $stmt = $pdo->query("
-            SELECT *
-            FROM services
-            WHERE is_active = 1
-            ORDER BY title ASC
+            SELECT s.*, u.name AS tutor_name
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            WHERE s.is_active = 1
+            ORDER BY s.title ASC
         ");
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -59,11 +65,34 @@ class ServiceRepository implements IServiceRepository
         return array_map(fn($row) => ServiceModel::fromArray($row), $rows);
     }
 
+    public function getAllByTutorId(int $tutorId): array
+    {
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("
+            SELECT s.*, u.name AS tutor_name
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            WHERE s.tutor_id = :tutor_id
+            ORDER BY s.title ASC
+        ");
+        $stmt->execute([':tutor_id' => $tutorId]);
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn(array $row) => ServiceModel::fromArray($row), $rows);
+    }
+
     public function find(int $id): ?ServiceModel
     {
         $pdo = Database::getConnection();
 
-        $stmt = $pdo->prepare("SELECT * FROM services WHERE id = :id");
+        $stmt = $pdo->prepare("
+            SELECT s.*, u.name AS tutor_name
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            WHERE s.id = :id
+            LIMIT 1
+        ");
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

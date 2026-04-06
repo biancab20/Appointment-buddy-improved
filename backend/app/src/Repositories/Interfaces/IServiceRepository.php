@@ -3,7 +3,6 @@
 namespace App\Repositories\Interfaces;
 
 use App\Models\ServiceModel;
-use App\Models\TimeslotModel;
 
 interface IServiceRepository
 {
@@ -17,6 +16,10 @@ interface IServiceRepository
     /** Student action: Get all active services*/
     /** @return ServiceModel[] */
     public function getAllActive(): array;
+
+    /** Tutor action: Get all owned services */
+    /** @return ServiceModel[] */
+    public function getAllByTutorId(int $tutorId): array;
 
     /** Helper: Get service by id*/
     public function find(int $id): ?ServiceModel;

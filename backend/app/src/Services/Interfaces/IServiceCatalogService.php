@@ -3,18 +3,26 @@
 namespace App\Services\Interfaces;
 
 use App\Models\ServiceModel;
-use App\Models\TimeslotModel;
 
 interface IServiceCatalogService
 {
     /** @return ServiceModel[] */
     public function getAllServices(): array;
 
+    /** @return ServiceModel[] */
+    public function getServicesByTutorId(int $tutorId): array;
+
     public function getAllActiveServices(): array;
 
     public function getService(int $id): ?ServiceModel;
 
-    public function createService(string $title, ?string $description, int $durationMinutes, float $price): int;
+    public function createService(
+        int $tutorId,
+        string $title,
+        ?string $description,
+        int $durationMinutes,
+        float $price
+    ): int;
 
     public function updateService(int $id, string $title, ?string $description, int $durationMinutes, float $price): void;
 
