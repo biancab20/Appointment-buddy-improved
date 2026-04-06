@@ -38,6 +38,7 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     // Student service browsing
     $r->addRoute('GET', '/api/student/services', ['App\\Controllers\\Api\\ServiceApiController', 'studentServices']);
     $r->addRoute('GET', '/api/student/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'studentTimeslots']);
+    $r->addRoute('GET', '/api/student/bookings', ['App\\Controllers\\Api\\BookingApiController', 'studentBookings']);
     $r->addRoute('GET', '/api/student/bookings/upcoming-count', ['App\\Controllers\\Api\\BookingApiController', 'upcomingCount']);
     $r->addRoute('POST', '/api/student/bookings/checkout-session', ['App\\Controllers\\Api\\BookingApiController', 'createCheckoutSession']);
     $r->addRoute('POST', '/api/stripe/webhook', ['App\\Controllers\\Api\\BookingApiController', 'stripeWebhook']);

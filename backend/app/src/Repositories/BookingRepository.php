@@ -96,6 +96,86 @@ class BookingRepository implements IBookingRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getForStudentPaginated(
+        int $userId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        $whereParts = ['b.student_id = :user_id'];
+        $params = [':user_id' => $userId];
+
+        if ($scope === 'upcoming') {
+            $whereParts[] = "b.status = 'paid'";
+            $whereParts[] = "t.start_time >= NOW()";
+        } else {
+            $whereParts[] = "(t.start_time < NOW() OR b.status = 'cancelled')";
+        }
+
+        if ($dateFrom !== null) {
+            $whereParts[] = 'DATE(t.start_time) >= :date_from';
+            $params[':date_from'] = $dateFrom;
+        }
+
+        if ($dateTo !== null) {
+            $whereParts[] = 'DATE(t.start_time) <= :date_to';
+            $params[':date_to'] = $dateTo;
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            WHERE {$whereSql}
+        ");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+
+        $orderDirection = $scope === 'upcoming' ? 'ASC' : 'DESC';
+
+        $stmt = $pdo->prepare("
+            SELECT
+                b.id,
+                b.status,
+                b.created_at,
+                b.price_at_booking,
+                b.timeslot_id,
+                t.start_time,
+                t.end_time,
+                s.id AS service_id,
+                s.title AS service_title,
+                u.id AS tutor_id,
+                u.name AS tutor_name
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            JOIN users u ON s.tutor_id = u.id
+            WHERE {$whereSql}
+            ORDER BY t.start_time {$orderDirection}
+            LIMIT :limit OFFSET :offset
+        ");
+
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'total' => $total,
+        ];
+    }
+
     public function cancelForUser(int $bookingId, int $userId): bool
     {
         $pdo = Database::getConnection();

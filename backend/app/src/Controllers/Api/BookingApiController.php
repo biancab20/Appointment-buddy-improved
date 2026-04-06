@@ -43,6 +43,59 @@ class BookingApiController extends ApiBaseController
         ]);
     }
 
+    // GET /api/student/bookings
+    public function studentBookings(): void
+    {
+        $this->requireStudent();
+
+        try {
+            $scope = strtolower(trim((string)($_GET['scope'] ?? 'upcoming')));
+            if (!in_array($scope, ['upcoming', 'history'], true)) {
+                throw new \RuntimeException('Invalid scope value.');
+            }
+
+            $page = $this->readRequiredIntQuery('page', 1, 1);
+            $perPage = $this->readRequiredIntQuery('per_page', 6, 1);
+            $perPage = min($perPage, 20);
+
+            $dateFrom = $this->readOptionalDateQuery('date_from');
+            $dateTo = $this->readOptionalDateQuery('date_to');
+
+            $result = $this->bookingService->getBookingsForUserPaginated(
+                $this->authUserId(),
+                $scope,
+                $dateFrom,
+                $dateTo,
+                $page,
+                $perPage
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $bookings = $result['items'] ?? [];
+        $total = (int)($result['total'] ?? 0);
+        $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+
+        $this->json([
+            'bookings' => $bookings,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_prev' => $page > 1,
+                'has_next' => $page < $totalPages,
+            ],
+            'filters' => [
+                'scope' => $scope,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+        ]);
+    }
+
     // POST /api/student/bookings/checkout-session
     public function createCheckoutSession(): void
     {
@@ -98,5 +151,39 @@ class BookingApiController extends ApiBaseController
         }
 
         $this->json(['received' => true], 200);
+    }
+
+    private function readRequiredIntQuery(string $key, int $default, int $min): int
+    {
+        $rawValue = $_GET[$key] ?? null;
+        if ($rawValue === null || $rawValue === '') {
+            return $default;
+        }
+
+        $value = filter_var($rawValue, FILTER_VALIDATE_INT);
+        if ($value === false || $value < $min) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        return (int)$value;
+    }
+
+    private function readOptionalDateQuery(string $key): ?string
+    {
+        $rawValue = trim((string)($_GET[$key] ?? ''));
+        if ($rawValue === '') {
+            return null;
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawValue)) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        [$year, $month, $day] = array_map('intval', explode('-', $rawValue));
+        if (!checkdate($month, $day, $year)) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
     }
 }

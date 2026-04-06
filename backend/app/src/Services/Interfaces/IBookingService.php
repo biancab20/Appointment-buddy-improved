@@ -12,6 +12,20 @@ interface IBookingService
     /** Student views own bookings */
     public function getBookingsForUser(int $userId): array;
 
+    /**
+     * Student views own bookings with scope/date filters and pagination.
+     *
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getBookingsForUserPaginated(
+        int $userId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array;
+
     /** Admin views all bookings */
     public function getAllBookings(): array;
 

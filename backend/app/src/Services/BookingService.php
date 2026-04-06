@@ -68,6 +68,44 @@ class BookingService implements IBookingService
         return $this->bookingRepository->forUser($userId);
     }
 
+    public function getBookingsForUserPaginated(
+        int $userId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        if ($userId <= 0) {
+            throw new \RuntimeException('Invalid user id.');
+        }
+
+        if (!in_array($scope, ['upcoming', 'history'], true)) {
+            throw new \RuntimeException('Invalid scope value.');
+        }
+
+        if ($page <= 0) {
+            throw new \RuntimeException('Page must be greater than 0.');
+        }
+
+        if ($perPage <= 0) {
+            throw new \RuntimeException('Per-page must be greater than 0.');
+        }
+
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \RuntimeException('Date from cannot be greater than date to.');
+        }
+
+        return $this->bookingRepository->getForStudentPaginated(
+            $userId,
+            $scope,
+            $dateFrom,
+            $dateTo,
+            $page,
+            $perPage
+        );
+    }
+
     public function getAllBookings(): array
     {
         return $this->bookingRepository->getAll();

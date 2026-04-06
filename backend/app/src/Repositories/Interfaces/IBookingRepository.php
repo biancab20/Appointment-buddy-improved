@@ -12,6 +12,20 @@ interface IBookingRepository
     /** Get all bookings for a specific student */
     public function forUser(int $userId): array;
 
+    /**
+     * Get student bookings with scope/date filters and pagination.
+     *
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getForStudentPaginated(
+        int $userId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array;
+
     /** Get all bookings for admin */
     public function getAll(): array;
 
