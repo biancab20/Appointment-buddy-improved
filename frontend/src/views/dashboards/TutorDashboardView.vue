@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { api } from '@/lib/api'
 
@@ -85,17 +86,17 @@ onMounted(() => {
       <p class="subtle-info">Total services created: {{ totalServices }}</p>
 
       <div class="action-list">
-        <article class="action-card action-primary">
+        <RouterLink to="/tutor/services" class="action-card action-primary action-link">
           <h2>Manage Services</h2>
           <p>Create, update, and deactivate your tutoring services.</p>
           <span class="action-note">Tutor service CRUD enabled via API</span>
-        </article>
+        </RouterLink>
 
-        <article class="action-card action-dark">
+        <RouterLink to="/tutor/services" class="action-card action-dark action-link">
           <h2>Manage Timeslots</h2>
           <p>Add, edit, and cancel timeslots for the services you own.</p>
           <span class="action-note">Tutor timeslot CRUD enabled via API</span>
-        </article>
+        </RouterLink>
 
         <article class="action-card action-light">
           <h2>Bookings Overview</h2>
@@ -159,6 +160,16 @@ h1 {
 .action-card {
   border-radius: 14px;
   padding: 1rem 1.1rem;
+}
+
+.action-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.action-link:hover {
+  transform: translateY(-1px);
+  transition: transform 0.2s ease;
 }
 
 .action-card h2 {

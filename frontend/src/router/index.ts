@@ -66,6 +66,18 @@ const router = createRouter({
       meta: { requiresAuth: true, allowedRoles: ['tutor'] },
     },
     {
+      path: '/tutor/services',
+      name: 'tutor-services',
+      component: () => import('../views/tutor/TutorServicesView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['tutor'] },
+    },
+    {
+      path: '/tutor/services/:id/timeslots',
+      name: 'tutor-service-timeslots',
+      component: () => import('../views/tutor/TutorTimeslotsView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['tutor'] },
+    },
+    {
       path: '/admin/dashboard',
       name: 'admin-dashboard',
       component: () => import('../views/dashboards/AdminDashboardView.vue'),
