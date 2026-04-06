@@ -87,7 +87,7 @@ async function onSubmit(): Promise<void> {
 
       <p class="auth-footer">
         No account yet?
-        <RouterLink to="/signup">Create one</RouterLink>
+        <RouterLink to="/register">Create one</RouterLink>
       </p>
     </section>
   </main>

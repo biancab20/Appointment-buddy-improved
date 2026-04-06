@@ -34,7 +34,12 @@ function isUserRole(value: unknown): value is UserRole {
 }
 
 function isAuthEndpoint(url: string): boolean {
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')
+  return (
+    url.includes('/api/register') ||
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  )
 }
 
 function getAuthStoreSafe() {

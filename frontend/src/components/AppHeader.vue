@@ -27,7 +27,7 @@ async function logout(): Promise<void> {
       <template v-if="!isAuthenticated">
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/login">Log in</RouterLink>
-        <RouterLink to="/signup">Sign up</RouterLink>
+        <RouterLink to="/register">Sign up</RouterLink>
       </template>
 
       <template v-else>

@@ -22,6 +22,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 
 $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('GET', '/api/health', ['App\\Controllers\\Api\\HealthApiController', 'index']);
+    $r->addRoute('POST', '/api/register', ['App\\Controllers\\Api\\AuthApiController', 'register']);
     $r->addRoute('POST', '/auth/login', ['App\\Controllers\\Api\\AuthApiController', 'login']);
     $r->addRoute('POST', '/auth/refresh', ['App\\Controllers\\Api\\AuthApiController', 'refresh']);
     $r->addRoute('POST', '/auth/logout', ['App\\Controllers\\Api\\AuthApiController', 'logout']);

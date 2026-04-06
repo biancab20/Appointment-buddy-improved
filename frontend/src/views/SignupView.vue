@@ -4,10 +4,20 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 type SignupRole = 'student' | 'tutor'
 
+interface RegisterResponse {
+  access_token: string
+  refresh_token: string
+  user: {
+    role: SignupRole | 'admin'
+  }
+}
+
 const router = useRouter()
+const authStore = useAuthStore()
 
 const name = ref('')
 const email = ref('')
@@ -17,11 +27,9 @@ const role = ref<SignupRole>('student')
 
 const isLoading = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
 
 async function onSubmit(): Promise<void> {
   errorMessage.value = ''
-  successMessage.value = ''
 
   if (name.value.trim() === '' || email.value.trim() === '' || password.value.trim() === '') {
     errorMessage.value = 'Name, email, and password are required.'
@@ -41,23 +49,24 @@ async function onSubmit(): Promise<void> {
   isLoading.value = true
 
   try {
-    await api.post('/auth/register', {
+    const response = await api.post<RegisterResponse>('/api/register', {
       name: name.value,
       email: email.value,
       password: password.value,
       role: role.value,
     })
 
-    successMessage.value = 'Your account has been created. You can now log in.'
-    await router.push({ name: 'login' })
+    const data = response.data
+
+    if (data.user.role !== 'student' && data.user.role !== 'tutor' && data.user.role !== 'admin') {
+      throw new Error('Unexpected role returned from register endpoint')
+    }
+
+    authStore.setSession(data.access_token, data.user.role, data.refresh_token ?? null)
+    await router.push('/dashboard')
   } catch (error: unknown) {
     if (axios.isAxiosError<{ error?: string }>(error)) {
-      if (error.response?.status === 404) {
-        errorMessage.value =
-          'Registration endpoint is not available yet. Add backend route POST /auth/register next.'
-      } else {
-        errorMessage.value = error.response?.data?.error ?? 'Sign up failed. Please try again.'
-      }
+      errorMessage.value = error.response?.data?.error ?? 'Sign up failed. Please try again.'
     } else {
       errorMessage.value = 'Sign up failed. Please try again.'
     }
@@ -120,7 +129,6 @@ async function onSubmit(): Promise<void> {
         </fieldset>
 
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success">{{ successMessage }}</p>
 
         <button type="submit" class="submit" :disabled="isLoading">
           {{ isLoading ? 'Creating account...' : 'Sign up' }}
@@ -227,12 +235,6 @@ input:focus {
 
 .error {
   color: #b42318;
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.success {
-  color: #166534;
   font-size: 0.92rem;
   font-weight: 700;
 }

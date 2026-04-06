@@ -17,6 +17,51 @@ class AuthApiController extends ApiBaseController
         $this->jwtService = new JwtService();
     }
 
+    public function register(): void
+    {
+        $payload = $this->readJsonBody();
+
+        $name = (string)($payload['name'] ?? '');
+        $email = (string)($payload['email'] ?? '');
+        $password = (string)($payload['password'] ?? '');
+        $role = (string)($payload['role'] ?? '');
+
+        try {
+            $userId = $this->userService->registerUser($name, $email, $password, $role);
+            $user = $this->userService->findById($userId);
+
+            if (!$user) {
+                $this->json(['error' => 'Registration failed.'], 500);
+                return;
+            }
+
+            $accessToken = $this->jwtService->issueAccessToken($user);
+            $refreshToken = $this->jwtService->issueRefreshToken((int)$user->id);
+
+            $this->json([
+                'token_type' => 'Bearer',
+                'access_token' => $accessToken,
+                'expires_in' => $this->jwtService->getAccessTokenTtlSeconds(),
+                'refresh_token' => $refreshToken,
+                'refresh_expires_in' => $this->jwtService->getRefreshTokenTtlSeconds(),
+                'user' => [
+                    'id' => (int)$user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ],
+            ], 201);
+        } catch (\RuntimeException $e) {
+            $message = $e->getMessage();
+            if (str_contains($message, 'already exists')) {
+                $this->json(['error' => $message], 409);
+                return;
+            }
+
+            $this->json(['error' => $message], 400);
+        }
+    }
+
     public function login(): void
     {
         $payload = $this->readJsonBody();

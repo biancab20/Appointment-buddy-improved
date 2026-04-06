@@ -20,8 +20,8 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
-      path: '/signup',
-      name: 'signup',
+      path: '/register',
+      name: 'register',
       component: () => import('../views/SignupView.vue'),
       meta: { guestOnly: true },
     },

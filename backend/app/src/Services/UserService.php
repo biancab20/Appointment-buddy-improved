@@ -43,7 +43,7 @@ class UserService implements IUserService
             throw new \RuntimeException("Role is required.");
         }
 
-        if (!UserModel::isAllowedRole($role)) {
+        if (!in_array($role, [UserModel::ROLE_TUTOR, UserModel::ROLE_STUDENT], true)) {
             throw new \RuntimeException("Invalid role. Allowed values: tutor, student.");
         }
 
