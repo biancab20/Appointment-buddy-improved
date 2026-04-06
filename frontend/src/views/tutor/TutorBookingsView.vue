@@ -2,6 +2,8 @@
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 
+import BookingCalendarMonth from '@/components/bookings/BookingCalendarMonth.vue'
+import TutorBookingCard from '@/components/bookings/TutorBookingCard.vue'
 import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PaginationControls from '@/components/common/PaginationControls.vue'
@@ -13,14 +15,11 @@ import type {
 } from '@/stores/tutorBookings'
 import { useTutorBookingsStore } from '@/stores/tutorBookings'
 import {
-  formatDate,
   formatIsoDate,
   formatMonthYear,
-  formatTime,
   isIsoDate,
   isPastDateTime,
 } from '@/utils/dateTime'
-import { formatPrice } from '@/utils/number'
 
 interface TutorFilters {
   dateFrom: string
@@ -107,27 +106,22 @@ const calendarCells = computed<CalendarCell[]>(() => {
 })
 
 function statusLabel(booking: TutorBooking): string {
-  if (booking.status === 'cancelled') {
-    return 'Cancelled'
-  }
-
-  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
-    return 'Completed'
-  }
-
+  const tone = statusTone(booking)
+  if (tone === 'cancelled') return 'Cancelled'
+  if (tone === 'completed') return 'Completed'
   return 'Paid'
 }
 
-function statusClass(booking: TutorBooking): string {
+function statusTone(booking: TutorBooking): 'paid' | 'completed' | 'cancelled' {
   if (booking.status === 'cancelled') {
-    return 'status-cancelled'
+    return 'cancelled'
   }
 
   if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
-    return 'status-completed'
+    return 'completed'
   }
 
-  return 'status-paid'
+  return 'paid'
 }
 
 function canTutorCancel(booking: TutorBooking): boolean {
@@ -336,40 +330,13 @@ onMounted(() => {
     </section>
 
     <section class="split-grid">
-      <article class="panel calendar-panel">
-        <header class="calendar-head">
-          <button type="button" class="nav-btn" @click="moveCalendarMonth(-1)">Previous</button>
-          <h2>{{ monthLabel }}</h2>
-          <button type="button" class="nav-btn" @click="moveCalendarMonth(1)">Next</button>
-        </header>
-
-        <div class="weekday-row">
-          <span>Mon</span>
-          <span>Tue</span>
-          <span>Wed</span>
-          <span>Thu</span>
-          <span>Fri</span>
-          <span>Sat</span>
-          <span>Sun</span>
-        </div>
-
-        <div class="calendar-grid">
-          <button
-            v-for="cell in calendarCells"
-            :key="cell.key"
-            type="button"
-            class="calendar-cell"
-            :class="{ empty: !cell.date, hasBooking: cell.count > 0 }"
-            :disabled="!cell.date"
-            @click="cell.date ? selectCalendarDate(cell.date) : undefined"
-          >
-            <span v-if="cell.day !== null" class="day">{{ cell.day }}</span>
-            <span v-if="cell.count > 0" class="dot"></span>
-          </button>
-        </div>
-
-        <p class="calendar-help">Click a day with a dot to filter list bookings for that date.</p>
-      </article>
+      <BookingCalendarMonth
+        :month-label="monthLabel"
+        :cells="calendarCells"
+        @previous="moveCalendarMonth(-1)"
+        @next="moveCalendarMonth(1)"
+        @select-date="selectCalendarDate"
+      />
 
       <article class="panel list-panel">
         <h2>Bookings List</h2>
@@ -383,34 +350,16 @@ onMounted(() => {
 
         <template v-else>
           <section class="booking-list">
-            <article v-for="booking in bookings" :key="booking.id" class="booking-card">
-              <div class="card-head">
-                <div>
-                  <h3>{{ booking.service_title }}</h3>
-                  <p class="meta">
-                    {{ formatDate(booking.start_time) }} | {{ formatTime(booking.start_time) }} ->
-                    {{ formatTime(booking.end_time) }}
-                  </p>
-                  <p class="meta">Student: {{ booking.student_name }} ({{ booking.student_email }})</p>
-                  <p class="meta">Paid: EUR {{ formatPrice(booking.price_at_booking) }}</p>
-                </div>
-
-                <span class="status-badge" :class="statusClass(booking)">
-                  {{ statusLabel(booking) }}
-                </span>
-              </div>
-
-              <div v-if="canTutorCancel(booking)" class="card-actions">
-                <button
-                  type="button"
-                  class="action-btn"
-                  :disabled="isActionLoading(booking.id)"
-                  @click="cancelTutorBooking(booking)"
-                >
-                  {{ isActionLoading(booking.id) ? 'Working...' : 'Cancel Booking' }}
-                </button>
-              </div>
-            </article>
+            <TutorBookingCard
+              v-for="booking in bookings"
+              :key="booking.id"
+              :booking="booking"
+              :status-label="statusLabel(booking)"
+              :status-tone="statusTone(booking)"
+              :can-cancel="canTutorCancel(booking)"
+              :action-loading="isActionLoading(booking.id)"
+              @cancel="cancelTutorBooking"
+            />
 
             <p v-if="bookings.length === 0" class="muted empty-message">
               {{
@@ -440,68 +389,6 @@ onMounted(() => {
   margin: 0 auto;
   max-width: 1040px;
   min-height: 72vh;
-}
-
-.heading-row {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-h1 {
-  color: #0f3341;
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
-  margin-bottom: 0.2rem;
-}
-
-.subtitle {
-  color: #884e1c;
-}
-
-.feedback {
-  border-radius: 10px;
-  margin-bottom: 0.75rem;
-  padding: 0.66rem 0.8rem;
-}
-
-.feedback.error {
-  background: #fff1f1;
-  border: 1px solid #f2c6c6;
-  color: #b42318;
-}
-
-.feedback.success {
-  background: #ecfdf3;
-  border: 1px solid #b7e7c8;
-  color: #067647;
-}
-
-.tabs-row {
-  border-bottom: 1px solid rgba(229, 176, 95, 0.4);
-  display: flex;
-  gap: 0.35rem;
-  margin-bottom: 0.9rem;
-}
-
-.tab-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 9px 9px 0 0;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  opacity: 0.72;
-  padding: 0.48rem 0.82rem;
-}
-
-.tab-btn.active {
-  background: #fff;
-  border-color: rgba(229, 176, 95, 0.45);
-  border-bottom-color: #fff;
-  opacity: 1;
 }
 
 .panel {
@@ -580,88 +467,6 @@ h1 {
   grid-template-columns: 0.95fr 1.35fr;
 }
 
-.calendar-head {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.7rem;
-}
-
-.calendar-head h2 {
-  color: #0f3341;
-  font-size: 1.02rem;
-}
-
-.nav-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 7px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.34rem 0.56rem;
-}
-
-.weekday-row {
-  color: #5c6f7a;
-  display: grid;
-  font-size: 0.74rem;
-  font-weight: 700;
-  grid-template-columns: repeat(7, 1fr);
-  margin-bottom: 0.35rem;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.calendar-grid {
-  display: grid;
-  gap: 0.28rem;
-  grid-template-columns: repeat(7, 1fr);
-}
-
-.calendar-cell {
-  align-items: center;
-  background: #fff;
-  border: 1px solid #e7edf1;
-  border-radius: 8px;
-  cursor: pointer;
-  display: grid;
-  min-height: 2.6rem;
-  place-items: center;
-  position: relative;
-}
-
-.calendar-cell.empty {
-  background: #fafcfd;
-  cursor: default;
-}
-
-.calendar-cell.hasBooking {
-  border-color: #c57632;
-}
-
-.day {
-  color: #0f3341;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.dot {
-  background: #c57632;
-  border-radius: 999px;
-  bottom: 0.34rem;
-  height: 0.35rem;
-  position: absolute;
-  width: 0.35rem;
-}
-
-.calendar-help {
-  color: #5d707c;
-  font-size: 0.82rem;
-  margin-top: 0.6rem;
-}
-
 .list-panel h2 {
   color: #0f3341;
   font-size: 1.04rem;
@@ -690,122 +495,10 @@ h1 {
   margin-bottom: 0.75rem;
 }
 
-.booking-card {
-  border: 1px solid rgba(229, 176, 95, 0.38);
-  border-radius: 10px;
-  padding: 0.85rem 0.9rem;
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-}
-
-.booking-card h3 {
-  color: #0f3341;
-  font-size: 1rem;
-  margin-bottom: 0.2rem;
-}
-
-.meta {
-  color: #884e1c;
-  font-size: 0.84rem;
-  margin-bottom: 0.24rem;
-}
-
-.status-badge {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 0.24rem 0.52rem;
-  white-space: nowrap;
-}
-
-.status-paid {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
-}
-
-.status-completed {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-  color: #374151;
-}
-
-.status-cancelled {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #b91c1c;
-}
-
-.card-actions {
-  margin-top: 0.5rem;
-}
-
-.action-btn {
-  background: #0f3341;
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 0.4rem 0.7rem;
-}
-
-.action-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.pager {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.pager-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 7px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 0.36rem 0.58rem;
-}
-
-.pager-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.pager-info {
-  color: #4d5f69;
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
 .empty-message,
 .muted {
   color: #63727d;
   font-style: italic;
-}
-
-.back-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 8px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 0.46rem 0.76rem;
-  text-decoration: none;
 }
 
 @media (max-width: 940px) {
@@ -825,10 +518,6 @@ h1 {
 
   .actions {
     justify-content: flex-start;
-  }
-
-  .card-head {
-    flex-direction: column;
   }
 }
 </style>

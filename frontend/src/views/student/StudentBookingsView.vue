@@ -4,6 +4,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import StudentBookingCard from '@/components/bookings/StudentBookingCard.vue'
+import StudentRescheduleModal from '@/components/bookings/StudentRescheduleModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PaginationControls from '@/components/common/PaginationControls.vue'
 import ScopeTabs from '@/components/common/ScopeTabs.vue'
@@ -14,8 +16,7 @@ import type {
   StudentBookingsQuery,
 } from '@/stores/bookings'
 import { useBookingsStore } from '@/stores/bookings'
-import { dateKey, formatDate, formatTime, hoursUntil, isIsoDate, isPastDateTime } from '@/utils/dateTime'
-import { formatPrice } from '@/utils/number'
+import { dateKey, hoursUntil, isIsoDate, isPastDateTime } from '@/utils/dateTime'
 
 interface BookingFilters {
   dateFrom: string
@@ -99,27 +100,22 @@ const resultsSummary = computed(() => {
 })
 
 function statusLabel(booking: StudentBooking): string {
-  if (booking.status === 'cancelled') {
-    return 'Cancelled'
-  }
-
-  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
-    return 'Completed'
-  }
-
+  const tone = statusTone(booking)
+  if (tone === 'cancelled') return 'Cancelled'
+  if (tone === 'completed') return 'Completed'
   return 'Paid'
 }
 
-function statusClass(booking: StudentBooking): string {
+function statusTone(booking: StudentBooking): 'paid' | 'completed' | 'cancelled' {
   if (booking.status === 'cancelled') {
-    return 'status-cancelled'
+    return 'cancelled'
   }
 
   if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
-    return 'status-completed'
+    return 'completed'
   }
 
-  return 'status-paid'
+  return 'paid'
 }
 
 function policyHint(booking: StudentBooking): string {
@@ -236,30 +232,13 @@ async function goToPage(page: number): Promise<void> {
   await loadBookings(page)
 }
 
-function uniqueDateKeys(timeslots: RescheduleOption[]): string[] {
-  return [...new Set(timeslots.map((slot) => dateKey(slot.start_time)))]
-}
-
-function rescheduleSlotsForDate(): RescheduleOption[] {
-  if (!reschedule.selectedDate) {
-    return reschedule.timeslots
-  }
-
-  return reschedule.timeslots.filter((slot) => dateKey(slot.start_time) === reschedule.selectedDate)
-}
-
-function nextThreeRescheduleSlots(): RescheduleOption[] {
-  return reschedule.timeslots.slice(0, 3)
-}
-
 function selectRescheduleTimeslot(timeslotId: number): void {
   reschedule.selectedTimeslotId = timeslotId
   reschedule.error = ''
 }
 
-function selectNextRescheduleSlot(slot: RescheduleOption): void {
-  reschedule.selectedDate = dateKey(slot.start_time)
-  selectRescheduleTimeslot(slot.id)
+function updateRescheduleDate(value: string): void {
+  reschedule.selectedDate = value
 }
 
 function closeRescheduleModal(): void {
@@ -432,49 +411,19 @@ onMounted(() => {
       />
 
       <section class="booking-list">
-        <article v-for="booking in bookings" :key="booking.id" class="booking-card">
-          <div class="card-head">
-            <div>
-              <h2>{{ booking.service_title }}</h2>
-              <p class="meta">
-                {{ formatDate(booking.start_time) }} | {{ formatTime(booking.start_time) }} ->
-                {{ formatTime(booking.end_time) }}
-              </p>
-              <p class="meta">Tutor: {{ booking.tutor_name }}</p>
-              <p class="meta">Paid: EUR {{ formatPrice(booking.price_at_booking) }}</p>
-            </div>
-
-            <span class="status-badge" :class="statusClass(booking)">
-              {{ statusLabel(booking) }}
-            </span>
-          </div>
-
-          <template v-if="canManageBooking(booking)">
-            <p class="policy-hint">{{ policyHint(booking) }}</p>
-            <div class="card-actions">
-              <button
-                type="button"
-                class="action-btn action-outline"
-                :disabled="isActionLoading(booking.id)"
-                @click="openRescheduleModal(booking)"
-              >
-                {{
-                  isActionLoading(booking.id) && reschedule.bookingId === booking.id
-                    ? 'Loading...'
-                    : 'Reschedule'
-                }}
-              </button>
-              <button
-                type="button"
-                class="action-btn action-dark"
-                :disabled="isActionLoading(booking.id)"
-                @click="cancelBooking(booking)"
-              >
-                {{ isActionLoading(booking.id) ? 'Working...' : 'Cancel' }}
-              </button>
-            </div>
-          </template>
-        </article>
+        <StudentBookingCard
+          v-for="booking in bookings"
+          :key="booking.id"
+          :booking="booking"
+          :status-label="statusLabel(booking)"
+          :status-tone="statusTone(booking)"
+          :can-manage="canManageBooking(booking)"
+          :policy-hint="policyHint(booking)"
+          :action-loading="isActionLoading(booking.id)"
+          :reschedule-loading="isActionLoading(booking.id) && reschedule.bookingId === booking.id"
+          @reschedule="openRescheduleModal"
+          @cancel="cancelBooking"
+        />
 
         <p v-if="bookings.length === 0" class="muted empty-message">
           {{
@@ -486,82 +435,20 @@ onMounted(() => {
       </section>
     </template>
 
-    <div v-if="reschedule.open" class="modal-backdrop" @click.self="closeRescheduleModal">
-      <section class="reschedule-modal" role="dialog" aria-modal="true" aria-labelledby="rescheduleTitle">
-        <div class="modal-header">
-          <div>
-            <h2 id="rescheduleTitle" class="modal-title">Reschedule Booking</h2>
-            <p class="modal-subtitle">{{ reschedule.serviceTitle }}</p>
-          </div>
-          <button type="button" class="close-btn" @click="closeRescheduleModal">Close</button>
-        </div>
-
-        <p v-if="reschedule.loading" class="muted">Loading alternative timeslots...</p>
-        <p v-else-if="reschedule.error" class="feedback error inline">{{ reschedule.error }}</p>
-
-        <template v-else>
-          <div class="modal-grid">
-            <div>
-              <label class="label" for="reschedule-date">Choose a date</label>
-              <select
-                id="reschedule-date"
-                v-model="reschedule.selectedDate"
-                class="date-select"
-              >
-                <option
-                  v-for="dateOption in uniqueDateKeys(reschedule.timeslots)"
-                  :key="dateOption"
-                  :value="dateOption"
-                >
-                  {{ formatDate(`${dateOption}T00:00`) }}
-                </option>
-              </select>
-
-              <div class="timeslot-list">
-                <p class="label">Available times</p>
-                <button
-                  v-for="slot in rescheduleSlotsForDate()"
-                  :key="slot.id"
-                  type="button"
-                  class="timeslot-row selectable"
-                  :class="{ selected: reschedule.selectedTimeslotId === slot.id }"
-                  @click="selectRescheduleTimeslot(slot.id)"
-                >
-                  {{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <p class="label">Next 3 available</p>
-              <button
-                v-for="slot in nextThreeRescheduleSlots()"
-                :key="slot.id"
-                type="button"
-                class="next-row selectable"
-                :class="{ selected: reschedule.selectedTimeslotId === slot.id }"
-                @click="selectNextRescheduleSlot(slot)"
-              >
-                <div>{{ formatDate(slot.start_time) }}</div>
-                <div>{{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}</div>
-              </button>
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="ghost-btn" @click="closeRescheduleModal">Cancel</button>
-            <button
-              type="button"
-              class="primary-btn"
-              :disabled="!reschedule.selectedTimeslotId || reschedule.submitting"
-              @click="submitReschedule"
-            >
-              {{ reschedule.submitting ? 'Updating...' : 'Update timeslot' }}
-            </button>
-          </div>
-        </template>
-      </section>
-    </div>
+    <StudentRescheduleModal
+      :open="reschedule.open"
+      :service-title="reschedule.serviceTitle"
+      :loading="reschedule.loading"
+      :error-message="reschedule.error"
+      :submitting="reschedule.submitting"
+      :timeslots="reschedule.timeslots"
+      :selected-date="reschedule.selectedDate"
+      :selected-timeslot-id="reschedule.selectedTimeslotId"
+      @close="closeRescheduleModal"
+      @update:selected-date="updateRescheduleDate"
+      @select-timeslot="selectRescheduleTimeslot"
+      @submit="submitReschedule"
+    />
   </main>
 </template>
 
@@ -571,59 +458,6 @@ onMounted(() => {
   max-width: 980px;
   min-height: 72vh;
   padding: 0.6rem 0 1.5rem;
-}
-
-.heading-row {
-  align-items: flex-start;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  margin-bottom: 1.1rem;
-}
-
-h1 {
-  color: #0f3341;
-  font-family: var(--font-display);
-  font-size: clamp(1.55rem, 4vw, 2.25rem);
-  margin-bottom: 0.18rem;
-}
-
-.subtitle {
-  color: #884e1c;
-  font-size: 0.97rem;
-  font-weight: 600;
-}
-
-.tabs-row {
-  align-items: center;
-  border-bottom: 1px solid rgba(229, 176, 95, 0.4);
-  display: flex;
-  gap: 0.35rem;
-  margin-bottom: 0.95rem;
-}
-
-.tab-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 9px 9px 0 0;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  opacity: 0.72;
-  padding: 0.5rem 0.84rem;
-  transition: opacity 0.18s ease;
-}
-
-.tab-btn:hover {
-  opacity: 1;
-}
-
-.tab-btn.active {
-  background: #fff;
-  border-color: rgba(229, 176, 95, 0.45);
-  border-bottom-color: #fff;
-  opacity: 1;
 }
 
 .panel {
@@ -718,285 +552,9 @@ h1 {
   margin-bottom: 0.72rem;
 }
 
-.pager {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 0.9rem;
-}
-
-.pager-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 7px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  padding: 0.38rem 0.62rem;
-}
-
-.pager-btn:hover {
-  background: #f6f8f9;
-}
-
-.pager-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.pager-info {
-  color: #4d5f69;
-  font-size: 0.88rem;
-  font-weight: 700;
-  margin: 0 0.15rem;
-}
-
 .booking-list {
   display: grid;
   gap: 0.9rem;
-}
-
-.booking-card {
-  background: #fff;
-  border: 1px solid rgba(229, 176, 95, 0.4);
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(15, 51, 65, 0.08);
-  padding: 1.05rem 1.1rem;
-}
-
-.card-head {
-  align-items: flex-start;
-  display: flex;
-  gap: 0.8rem;
-  justify-content: space-between;
-}
-
-.booking-card h2 {
-  color: #0f3341;
-  font-size: 1.08rem;
-  line-height: 1.25;
-  margin-bottom: 0.32rem;
-}
-
-.meta {
-  color: #884e1c;
-  font-size: 0.88rem;
-  margin-bottom: 0.28rem;
-}
-
-.policy-hint {
-  color: #4d5f69;
-  font-size: 0.82rem;
-  margin-top: 0.5rem;
-}
-
-.card-actions {
-  display: flex;
-  gap: 0.45rem;
-  margin-top: 0.55rem;
-}
-
-.action-btn {
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  padding: 0.4rem 0.74rem;
-}
-
-.action-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.action-outline {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  color: #0f3341;
-}
-
-.action-outline:hover {
-  background: #f6f8f9;
-}
-
-.action-dark {
-  background: #0f3341;
-  color: #fff;
-}
-
-.action-dark:hover {
-  background: #18475c;
-}
-
-.status-badge {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.28rem 0.56rem;
-  white-space: nowrap;
-}
-
-.status-paid {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
-}
-
-.status-completed {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-  color: #374151;
-}
-
-.status-cancelled {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #b91c1c;
-}
-
-.modal-backdrop {
-  align-items: center;
-  background: rgba(15, 51, 65, 0.4);
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  padding: 1rem;
-  position: fixed;
-  z-index: 80;
-}
-
-.reschedule-modal {
-  background: #fff;
-  border: 1px solid rgba(229, 176, 95, 0.42);
-  border-radius: 14px;
-  box-shadow: 0 14px 30px rgba(15, 51, 65, 0.2);
-  max-height: 90vh;
-  max-width: 760px;
-  overflow-y: auto;
-  padding: 1rem;
-  width: min(100%, 760px);
-}
-
-.modal-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.8rem;
-}
-
-.modal-title {
-  color: #0f3341;
-  font-size: 1.16rem;
-  font-weight: 800;
-}
-
-.modal-subtitle {
-  color: #884e1c;
-  font-size: 0.9rem;
-  margin-top: 0.15rem;
-}
-
-.close-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 8px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  padding: 0.4rem 0.7rem;
-}
-
-.close-btn:hover {
-  background: #f6f8f9;
-}
-
-.modal-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr 1fr;
-}
-
-.label {
-  color: #0f3341;
-  display: block;
-  font-size: 0.84rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  margin-bottom: 0.35rem;
-  text-transform: uppercase;
-}
-
-.date-select {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 9px;
-  margin-bottom: 0.7rem;
-  padding: 0.5rem 0.58rem;
-  width: 100%;
-}
-
-.timeslot-list {
-  display: grid;
-  gap: 0.38rem;
-}
-
-.timeslot-row,
-.next-row {
-  background: #fff;
-  border: 1px solid #ecd9c6;
-  border-radius: 9px;
-  color: #4d5f69;
-  font-size: 0.9rem;
-  padding: 0.48rem 0.58rem;
-}
-
-.selectable {
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-}
-
-.selectable:hover {
-  background: #fff8f0;
-}
-
-.selectable.selected {
-  border-color: #c57632;
-  box-shadow: 0 0 0 2px rgba(197, 118, 50, 0.18);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 0.45rem;
-  justify-content: flex-end;
-  margin-top: 0.9rem;
-}
-
-.feedback {
-  border-radius: 10px;
-  margin-bottom: 0.9rem;
-  padding: 0.68rem 0.82rem;
-}
-
-.feedback.inline {
-  margin-bottom: 0.3rem;
-}
-
-.feedback.error {
-  background: #fff1f1;
-  border: 1px solid #f2c6c6;
-  color: #b42318;
-}
-
-.feedback.success {
-  background: #ecfdf3;
-  border: 1px solid #b7e7c8;
-  color: #067647;
 }
 
 .empty-message {
@@ -1006,22 +564,6 @@ h1 {
 .muted {
   color: #63727d;
   font-style: italic;
-}
-
-.back-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 8px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 0.46rem 0.76rem;
-  text-decoration: none;
-}
-
-.back-btn:hover {
-  background: #f6f8f9;
 }
 
 @media (max-width: 840px) {
@@ -1034,31 +576,11 @@ h1 {
     justify-content: flex-start;
   }
 
-  .modal-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 760px) {
-  .heading-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .filters-form {
     grid-template-columns: 1fr;
-  }
-
-  .card-head {
-    flex-direction: column;
-  }
-
-  .card-actions {
-    flex-wrap: wrap;
-  }
-
-  .modal-actions {
-    justify-content: flex-start;
   }
 }
 </style>
