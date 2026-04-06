@@ -5,12 +5,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PaginationControls from '@/components/common/PaginationControls.vue'
+import StudentServiceCard from '@/components/services/StudentServiceCard.vue'
 import type { ServiceItem, StudentServicesQuery } from '@/stores/services'
 import { useServicesStore } from '@/stores/services'
 import type { StudentTimeslot } from '@/stores/timeslots'
 import { useTimeslotsStore } from '@/stores/timeslots'
-import { dateKey, formatDate, formatTime } from '@/utils/dateTime'
-import { formatPrice } from '@/utils/number'
+import { dateKey } from '@/utils/dateTime'
 
 interface ServiceTimeslotState {
   open: boolean
@@ -284,6 +284,11 @@ function selectTimeslot(serviceId: number, timeslotId: number): void {
   state.paymentError = ''
 }
 
+function updateSelectedDate(serviceId: number, value: string): void {
+  const state = ensureState(serviceId)
+  state.selectedDate = value
+}
+
 async function paySelectedTimeslot(serviceId: number): Promise<void> {
   const state = ensureState(serviceId)
   if (state.paymentLoading || !state.selectedTimeslotId) {
@@ -461,117 +466,27 @@ onMounted(() => {
       />
 
       <section class="service-list">
-        <article v-for="service in services" :key="service.id" class="service-card">
-          <h2>{{ service.title }}</h2>
-
-          <p v-if="service.description" class="description">{{ service.description }}</p>
-
-          <p class="meta">
-            Tutor: <strong>{{ service.tutor_name ?? 'Unknown tutor' }}</strong>
-          </p>
-          <p class="meta">
-            Duration: <strong>{{ service.duration_minutes }} min</strong> |
-            Price: <strong>EUR {{ formatPrice(service.price) }}</strong>
-          </p>
-
-          <button type="button" class="toggle-btn" @click="toggleTimeslots(service.id)">
-            {{ ensureState(service.id).open ? 'Hide timeslots' : 'View timeslots' }}
-          </button>
-
-          <div v-if="ensureState(service.id).open" class="timeslot-panel">
-            <p v-if="ensureState(service.id).loading" class="muted">Loading timeslots...</p>
-            <p v-else-if="ensureState(service.id).error" class="feedback error inline">
-              {{ ensureState(service.id).error }}
-            </p>
-
-            <template v-else>
-              <p v-if="ensureState(service.id).timeslots.length === 0" class="muted">
-                No available timeslots at the moment.
-              </p>
-
-              <template v-else>
-                <div class="timeslot-grid">
-                  <div>
-                    <label class="label" :for="`date-${service.id}`">Choose a date</label>
-                    <select
-                      :id="`date-${service.id}`"
-                      v-model="ensureState(service.id).selectedDate"
-                      class="date-select"
-                    >
-                      <option
-                        v-for="dateOption in uniqueDateKeys(ensureState(service.id).timeslots)"
-                        :key="dateOption"
-                        :value="dateOption"
-                      >
-                        {{ formatDate(`${dateOption}T00:00`) }}
-                      </option>
-                    </select>
-
-                    <div class="timeslot-list">
-                      <p class="label">Available times</p>
-                      <button
-                        v-for="slot in slotsForDate(service.id)"
-                        :key="slot.id"
-                        type="button"
-                        class="timeslot-row selectable"
-                        :class="{
-                          selected: ensureState(service.id).selectedTimeslotId === slot.id,
-                        }"
-                        @click="selectTimeslot(service.id, slot.id)"
-                      >
-                        {{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p class="label">Next 3 available</p>
-                    <button
-                      v-for="slot in nextThree(service.id)"
-                      :key="slot.id"
-                      type="button"
-                      class="next-row selectable"
-                      :class="{
-                        selected: ensureState(service.id).selectedTimeslotId === slot.id,
-                      }"
-                      @click="selectTimeslot(service.id, slot.id)"
-                    >
-                      <div>{{ formatDate(slot.start_time) }}</div>
-                      <div>{{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}</div>
-                    </button>
-                  </div>
-                </div>
-
-                <section class="pay-panel">
-                  <p v-if="selectedTimeslot(service.id)" class="selected-slot">
-                    Selected:
-                    <strong>
-                      {{ formatDate(selectedTimeslot(service.id)?.start_time ?? '') }}
-                      {{ formatTime(selectedTimeslot(service.id)?.start_time ?? '') }} ->
-                      {{ formatTime(selectedTimeslot(service.id)?.end_time ?? '') }}
-                    </strong>
-                  </p>
-                  <p v-else class="muted">Select a timeslot to continue to payment.</p>
-
-                  <p v-if="ensureState(service.id).paymentError" class="feedback error inline">
-                    {{ ensureState(service.id).paymentError }}
-                  </p>
-
-                  <button
-                    type="button"
-                    class="pay-btn"
-                    :disabled="
-                      !ensureState(service.id).selectedTimeslotId || ensureState(service.id).paymentLoading
-                    "
-                    @click="paySelectedTimeslot(service.id)"
-                  >
-                    {{ ensureState(service.id).paymentLoading ? 'Redirecting...' : 'Pay' }}
-                  </button>
-                </section>
-              </template>
-            </template>
-          </div>
-        </article>
+        <StudentServiceCard
+          v-for="service in services"
+          :key="service.id"
+          :service="service"
+          :open="ensureState(service.id).open"
+          :loading="ensureState(service.id).loading"
+          :error-message="ensureState(service.id).error"
+          :timeslots="ensureState(service.id).timeslots"
+          :selected-date="ensureState(service.id).selectedDate"
+          :selected-timeslot-id="ensureState(service.id).selectedTimeslotId"
+          :selected-timeslot="selectedTimeslot(service.id)"
+          :payment-loading="ensureState(service.id).paymentLoading"
+          :payment-error="ensureState(service.id).paymentError"
+          :date-options="uniqueDateKeys(ensureState(service.id).timeslots)"
+          :filtered-timeslots="slotsForDate(service.id)"
+          :next-timeslots="nextThree(service.id)"
+          @toggle="toggleTimeslots(service.id)"
+          @update:selected-date="updateSelectedDate(service.id, $event)"
+          @select-timeslot="selectTimeslot(service.id, $event)"
+          @pay="paySelectedTimeslot(service.id)"
+        />
 
         <p v-if="services.length === 0" class="muted">No services available yet.</p>
       </section>
@@ -585,28 +500,6 @@ onMounted(() => {
   max-width: 920px;
   min-height: 72vh;
   padding: 0.45rem 0 1.4rem;
-}
-
-.heading-row {
-  align-items: center;
-  display: flex;
-  gap: 0.9rem;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
-}
-
-h1 {
-  color: #0f3341;
-  font-family: var(--font-display);
-  font-size: clamp(1.7rem, 4vw, 2.35rem);
-  line-height: 1.15;
-  margin-bottom: 0.25rem;
-}
-
-.subtitle {
-  color: #884e1c;
-  font-size: 1rem;
-  font-weight: 600;
 }
 
 .controls-row {
@@ -744,204 +637,9 @@ h1 {
   margin-bottom: 0.75rem;
 }
 
-.pager {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.95rem;
-}
-
-.pager-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 8px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  padding: 0.42rem 0.65rem;
-}
-
-.pager-btn:hover {
-  background: #f6f8f9;
-}
-
-.pager-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.pager-info {
-  color: #4d5f69;
-  font-size: 0.88rem;
-  font-weight: 700;
-  margin: 0 0.15rem;
-}
-
 .service-list {
   display: grid;
   gap: 1rem;
-}
-
-.service-card {
-  background: #fff;
-  border: 1px solid rgba(229, 176, 95, 0.42);
-  border-radius: 18px;
-  box-shadow: 0 14px 28px rgba(15, 51, 65, 0.08);
-  padding: 1.15rem;
-}
-
-.service-card h2 {
-  color: #0f3341;
-  font-size: 1.32rem;
-  line-height: 1.25;
-  margin-bottom: 0.35rem;
-}
-
-.description {
-  color: #884e1c;
-  margin-bottom: 0.45rem;
-  max-width: 70ch;
-}
-
-.meta {
-  color: #4e616c;
-  font-size: 0.93rem;
-  margin-bottom: 0.3rem;
-}
-
-.toggle-btn {
-  background: #c57632;
-  border: none;
-  border-radius: 10px;
-  box-shadow: 0 8px 18px rgba(197, 118, 50, 0.24);
-  color: #fff;
-  cursor: pointer;
-  font-weight: 700;
-  margin-top: 0.4rem;
-  padding: 0.58rem 0.95rem;
-}
-
-.toggle-btn:hover {
-  background: #d68744;
-}
-
-.timeslot-panel {
-  background: linear-gradient(180deg, #fffaf4, #fffefb);
-  border: 1px solid #f0decb;
-  border-radius: 14px;
-  margin-top: 0.95rem;
-  padding: 0.85rem;
-}
-
-.timeslot-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr 1fr;
-}
-
-.label {
-  color: #0f3341;
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  margin-bottom: 0.4rem;
-  text-transform: uppercase;
-}
-
-.date-select {
-  background: #fff;
-  border: 1px solid #d6c4af;
-  border-radius: 10px;
-  margin-bottom: 0.75rem;
-  padding: 0.55rem 0.62rem;
-  width: 100%;
-}
-
-.timeslot-list {
-  display: grid;
-  gap: 0.42rem;
-}
-
-.timeslot-row,
-.next-row {
-  background: #fff;
-  border: 1px solid #ecd9c6;
-  border-radius: 10px;
-  color: #4d5f69;
-  font-size: 0.92rem;
-  padding: 0.52rem 0.62rem;
-}
-
-.selectable {
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-}
-
-.selectable:hover {
-  background: #fff8f0;
-}
-
-.selectable.selected {
-  border-color: #c57632;
-  box-shadow: 0 0 0 2px rgba(197, 118, 50, 0.18);
-}
-
-.pay-panel {
-  align-items: flex-start;
-  border-top: 1px solid #f0decb;
-  display: grid;
-  gap: 0.45rem;
-  margin-top: 0.9rem;
-  padding-top: 0.85rem;
-}
-
-.selected-slot {
-  color: #4d5f69;
-  font-size: 0.9rem;
-}
-
-.selected-slot strong {
-  color: #0f3341;
-}
-
-.pay-btn {
-  background: #0f3341;
-  border: none;
-  border-radius: 10px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 700;
-  padding: 0.56rem 0.95rem;
-}
-
-.pay-btn:hover {
-  background: #174559;
-}
-
-.pay-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.feedback {
-  border-radius: 10px;
-  margin-bottom: 0.9rem;
-  padding: 0.68rem 0.82rem;
-}
-
-.feedback.inline {
-  margin-bottom: 0.2rem;
-}
-
-.feedback.error {
-  background: #fff1f1;
-  border: 1px solid #f2c6c6;
-  color: #b42318;
 }
 
 .muted {
@@ -949,31 +647,9 @@ h1 {
   font-style: italic;
 }
 
-.back-btn {
-  background: #fff;
-  border: 1px solid #d8dee3;
-  border-radius: 9px;
-  color: #0f3341;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 0.5rem 0.8rem;
-  text-decoration: none;
-}
-
-.back-btn:hover {
-  background: #f6f8f9;
-}
-
 @media (max-width: 760px) {
   .page-shell {
     padding-top: 0.1rem;
-  }
-
-  .heading-row {
-    align-items: flex-start;
-    flex-direction: column;
-    margin-bottom: 1rem;
   }
 
   .filters-grid {
@@ -986,10 +662,6 @@ h1 {
 
   .filter-actions {
     justify-content: flex-start;
-  }
-
-  .timeslot-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>
