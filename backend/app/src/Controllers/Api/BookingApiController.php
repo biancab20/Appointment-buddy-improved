@@ -26,4 +26,16 @@ class BookingApiController extends ApiBaseController
             'paid' => $paid
         ]);
     }
+
+    // GET /api/student/bookings/upcoming-count
+    public function upcomingCount(): void
+    {
+        $this->requireStudent();
+
+        $count = $this->bookingService->countUpcomingForUser($this->authUserId());
+
+        $this->json([
+            'upcoming_count' => $count,
+        ]);
+    }
 }

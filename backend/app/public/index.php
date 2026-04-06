@@ -31,6 +31,7 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     // Student service browsing
     $r->addRoute('GET', '/api/student/services', ['App\\Controllers\\Api\\ServiceApiController', 'studentServices']);
     $r->addRoute('GET', '/api/student/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'studentTimeslots']);
+    $r->addRoute('GET', '/api/student/bookings/upcoming-count', ['App\\Controllers\\Api\\BookingApiController', 'upcomingCount']);
 
     // Tutor service CRUD (owned services only)
     $r->addRoute('GET', '/api/tutor/services', ['App\\Controllers\\Api\\ServiceApiController', 'tutorServices']);

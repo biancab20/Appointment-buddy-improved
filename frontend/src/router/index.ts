@@ -60,6 +60,18 @@ const router = createRouter({
       meta: { requiresAuth: true, allowedRoles: ['student'] },
     },
     {
+      path: '/student/services',
+      name: 'student-services',
+      component: () => import('../views/student/StudentServicesView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['student'] },
+    },
+    {
+      path: '/student/bookings',
+      name: 'student-bookings',
+      component: () => import('../views/student/StudentBookingsView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['student'] },
+    },
+    {
       path: '/tutor/dashboard',
       name: 'tutor-dashboard',
       component: () => import('../views/dashboards/TutorDashboardView.vue'),
