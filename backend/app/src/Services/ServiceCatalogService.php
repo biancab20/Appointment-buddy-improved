@@ -39,6 +39,19 @@ class ServiceCatalogService implements IServiceCatalogService
         return $this->serviceRepository->getAllActive();
     }
 
+    public function getActiveServicesPaginated(array $filters, int $page, int $perPage): array
+    {
+        if ($page <= 0) {
+            throw new \RuntimeException("Page must be greater than 0.");
+        }
+
+        if ($perPage <= 0) {
+            throw new \RuntimeException("Per-page must be greater than 0.");
+        }
+
+        return $this->serviceRepository->getActivePaginated($filters, $page, $perPage);
+    }
+
     public function getService(int $id): ?ServiceModel
     {
         return $this->serviceRepository->find($id);

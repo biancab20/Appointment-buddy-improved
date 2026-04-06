@@ -14,6 +14,18 @@ interface IServiceCatalogService
 
     public function getAllActiveServices(): array;
 
+    /**
+     * @param array{
+     *   subject?: string,
+     *   min_duration?: int|null,
+     *   max_duration?: int|null,
+     *   min_price?: float|null,
+     *   max_price?: float|null
+     * } $filters
+     * @return array{items: ServiceModel[], total: int}
+     */
+    public function getActiveServicesPaginated(array $filters, int $page, int $perPage): array;
+
     public function getService(int $id): ?ServiceModel;
 
     public function createService(

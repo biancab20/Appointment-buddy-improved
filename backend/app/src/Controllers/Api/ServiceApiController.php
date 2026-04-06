@@ -25,10 +25,60 @@ class ServiceApiController extends ApiBaseController
     {
         $this->requireStudent();
 
-        $services = $this->serviceService->getAllActiveServices();
+        try {
+            $page = $this->readRequiredIntQuery('page', 1, 1);
+            $perPage = $this->readRequiredIntQuery('per_page', 6, 1);
+            $perPage = min($perPage, 20);
+
+            $subject = trim((string)($_GET['subject'] ?? ''));
+            $minDuration = $this->readOptionalIntQuery('min_duration', 1);
+            $maxDuration = $this->readOptionalIntQuery('max_duration', 1);
+            $minPrice = $this->readOptionalFloatQuery('min_price', 0);
+            $maxPrice = $this->readOptionalFloatQuery('max_price', 0);
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        if ($minDuration !== null && $maxDuration !== null && $minDuration > $maxDuration) {
+            $this->json(['error' => 'Min duration cannot be greater than max duration.'], 400);
+            return;
+        }
+
+        if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
+            $this->json(['error' => 'Min price cannot be greater than max price.'], 400);
+            return;
+        }
+
+        $result = $this->serviceService->getActiveServicesPaginated([
+            'subject' => $subject,
+            'min_duration' => $minDuration,
+            'max_duration' => $maxDuration,
+            'min_price' => $minPrice,
+            'max_price' => $maxPrice,
+        ], $page, $perPage);
+
+        $services = $result['items'] ?? [];
+        $total = (int)($result['total'] ?? 0);
+        $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
 
         $this->json([
-            'services' => array_map(fn($s) => $s->toArray(), $services)
+            'services' => array_map(fn($s) => $s->toArray(), $services),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_prev' => $page > 1,
+                'has_next' => $page < $totalPages,
+            ],
+            'filters' => [
+                'subject' => $subject,
+                'min_duration' => $minDuration,
+                'max_duration' => $maxDuration,
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice,
+            ],
         ]);
     }
 
@@ -303,6 +353,51 @@ class ServiceApiController extends ApiBaseController
         }
 
         return $service;
+    }
+
+    private function readRequiredIntQuery(string $key, int $default, int $min): int
+    {
+        $rawValue = $_GET[$key] ?? null;
+        if ($rawValue === null || $rawValue === '') {
+            return $default;
+        }
+
+        $value = filter_var($rawValue, FILTER_VALIDATE_INT);
+        if ($value === false || $value < $min) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        return (int)$value;
+    }
+
+    private function readOptionalIntQuery(string $key, int $min): ?int
+    {
+        $rawValue = $_GET[$key] ?? null;
+        if ($rawValue === null || $rawValue === '') {
+            return null;
+        }
+
+        $value = filter_var($rawValue, FILTER_VALIDATE_INT);
+        if ($value === false || $value < $min) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        return (int)$value;
+    }
+
+    private function readOptionalFloatQuery(string $key, float $min): ?float
+    {
+        $rawValue = $_GET[$key] ?? null;
+        if ($rawValue === null || $rawValue === '') {
+            return null;
+        }
+
+        $value = filter_var($rawValue, FILTER_VALIDATE_FLOAT);
+        if ($value === false || (float)$value < $min) {
+            throw new \RuntimeException("Invalid {$key} value.");
+        }
+
+        return (float)$value;
     }
 
     private function resolveTutorOwnedTimeslot(int $timeslotId): ?TimeslotModel

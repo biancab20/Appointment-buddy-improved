@@ -17,6 +17,19 @@ interface IServiceRepository
     /** @return ServiceModel[] */
     public function getAllActive(): array;
 
+    /**
+     * Student action: Get active services with pagination and filters.
+     * @param array{
+     *   subject?: string,
+     *   min_duration?: int|null,
+     *   max_duration?: int|null,
+     *   min_price?: float|null,
+     *   max_price?: float|null
+     * } $filters
+     * @return array{items: ServiceModel[], total: int}
+     */
+    public function getActivePaginated(array $filters, int $page, int $perPage): array;
+
     /** Tutor action: Get all owned services */
     /** @return ServiceModel[] */
     public function getAllByTutorId(int $tutorId): array;
