@@ -8,8 +8,13 @@ interface ITimeslotService
 {
     /** @return TimeslotModel[] */
     public function getUpcomingTimeslotsForService(int $serviceId): array;
+
+    public function getTimeslot(int $timeslotId): ?TimeslotModel;
+
     public function countUpcomingAvailableForService(int $serviceId): int;
+
     public function deactivateTimeslot(int $timeslotId): int;
+
     /** @return TimeslotModel[] */
     public function getAllForService(int $serviceId): array;
 

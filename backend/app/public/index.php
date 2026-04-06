@@ -38,6 +38,10 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('POST', '/api/tutor/services', ['App\\Controllers\\Api\\ServiceApiController', 'tutorCreateService']);
     $r->addRoute('PUT', '/api/tutor/services/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorUpdateService']);
     $r->addRoute('DELETE', '/api/tutor/services/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorDeleteService']);
+    $r->addRoute('GET', '/api/tutor/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'tutorServiceTimeslots']);
+    $r->addRoute('POST', '/api/tutor/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'tutorCreateTimeslot']);
+    $r->addRoute('PUT', '/api/tutor/timeslots/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorUpdateTimeslot']);
+    $r->addRoute('DELETE', '/api/tutor/timeslots/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorDeleteTimeslot']);
 
     $r->addRoute('GET', '/api/admin/bookings/pending', ['App\\Controllers\\Api\\BookingApiController', 'pending']);
 });

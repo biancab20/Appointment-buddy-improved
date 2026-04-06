@@ -28,6 +28,15 @@ class TimeslotService implements ITimeslotService
         return $this->timeslotRepository->getAllForService($serviceId);
     }
 
+    public function getTimeslot(int $timeslotId): ?TimeslotModel
+    {
+        if ($timeslotId <= 0) {
+            return null;
+        }
+
+        return $this->timeslotRepository->find($timeslotId);
+    }
+
     public function createForService(int $serviceId, string $start, string $end): int
     {
         $startDt = $this->parseDateTimeLocal($start);
