@@ -1,31 +1,20 @@
 <script setup lang="ts">
-import axios from 'axios'
+import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
-import { api } from '@/lib/api'
-
-interface TutorService {
-  id: number
-  title: string
-  duration_minutes: number
-  is_active: number | boolean
-}
-
-interface Timeslot {
-  id: number
-  service_id: number
-  start_time: string
-  end_time: string
-  is_active: number | boolean
-}
+import type { TutorTimeslot } from '@/stores/timeslots'
+import { useTimeslotsStore } from '@/stores/timeslots'
 
 const route = useRoute()
 const serviceId = computed(() => Number(route.params.id ?? 0))
 
-const service = ref<TutorService | null>(null)
-const timeslots = ref<Timeslot[]>([])
-const isLoading = ref(true)
+const timeslotsStore = useTimeslotsStore()
+const { tutorLoading, tutorService, tutorTimeslots } = storeToRefs(timeslotsStore)
+
+const service = computed(() => tutorService.value)
+const timeslots = computed(() => tutorTimeslots.value)
+const isLoading = computed(() => tutorLoading.value)
 const errorMessage = ref('')
 const successMessage = ref('')
 
@@ -83,7 +72,7 @@ function resetCreateForm(): void {
   createForm.start_time = ''
 }
 
-function startEdit(timeslot: Timeslot): void {
+function startEdit(timeslot: TutorTimeslot): void {
   editingTimeslotId.value = timeslot.id
   editForm.start_time = toInputDateTime(timeslot.start_time)
 }
@@ -93,30 +82,17 @@ function cancelEdit(): void {
 }
 
 async function loadTimeslots(): Promise<void> {
-  isLoading.value = true
   errorMessage.value = ''
 
   if (!Number.isInteger(serviceId.value) || serviceId.value <= 0) {
     errorMessage.value = 'Invalid service id.'
-    isLoading.value = false
     return
   }
 
   try {
-    const response = await api.get<{ service: TutorService; timeslots: Timeslot[] }>(
-      `/api/tutor/services/${serviceId.value}/timeslots`,
-    )
-
-    service.value = response.data.service
-    timeslots.value = response.data.timeslots ?? []
+    await timeslotsStore.fetchTutorServiceTimeslots(serviceId.value)
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to load timeslots.'
-    } else {
-      errorMessage.value = 'Unable to load timeslots.'
-    }
-  } finally {
-    isLoading.value = false
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to load timeslots.'
   }
 }
 
@@ -125,20 +101,14 @@ async function createTimeslot(): Promise<void> {
   successMessage.value = ''
 
   try {
-    await api.post(`/api/tutor/services/${serviceId.value}/timeslots`, {
-      start_time: createForm.start_time,
-    })
+    await timeslotsStore.createTutorTimeslot(serviceId.value, createForm.start_time)
 
     successMessage.value = 'Timeslot created.'
     showCreateForm.value = false
     resetCreateForm()
     await loadTimeslots()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to create timeslot.'
-    } else {
-      errorMessage.value = 'Unable to create timeslot.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to create timeslot.'
   }
 }
 
@@ -147,19 +117,13 @@ async function updateTimeslot(timeslotId: number): Promise<void> {
   successMessage.value = ''
 
   try {
-    await api.put(`/api/tutor/timeslots/${timeslotId}`, {
-      start_time: editForm.start_time,
-    })
+    await timeslotsStore.updateTutorTimeslot(timeslotId, editForm.start_time)
 
     successMessage.value = 'Timeslot updated.'
     editingTimeslotId.value = null
     await loadTimeslots()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to update timeslot.'
-    } else {
-      errorMessage.value = 'Unable to update timeslot.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to update timeslot.'
   }
 }
 
@@ -175,10 +139,7 @@ async function deactivateTimeslot(timeslotId: number): Promise<void> {
   }
 
   try {
-    const response = await api.delete<{ cancelled_bookings_count?: number }>(
-      `/api/tutor/timeslots/${timeslotId}`,
-    )
-    const cancelled = Number(response.data.cancelled_bookings_count ?? 0)
+    const cancelled = await timeslotsStore.deactivateTutorTimeslot(timeslotId)
 
     successMessage.value =
       cancelled > 0
@@ -187,11 +148,7 @@ async function deactivateTimeslot(timeslotId: number): Promise<void> {
 
     await loadTimeslots()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to deactivate timeslot.'
-    } else {
-      errorMessage.value = 'Unable to deactivate timeslot.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to deactivate timeslot.'
   }
 }
 

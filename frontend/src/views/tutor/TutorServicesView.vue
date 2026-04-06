@@ -1,21 +1,16 @@
 <script setup lang="ts">
-import axios from 'axios'
+import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import { api } from '@/lib/api'
+import type { TutorService, TutorServicePayload } from '@/stores/services'
+import { useServicesStore } from '@/stores/services'
 
-interface TutorService {
-  id: number
-  title: string
-  description: string | null
-  duration_minutes: number
-  price: number
-  is_active: number | boolean
-}
+const servicesStore = useServicesStore()
+const { tutorLoading, tutorServices } = storeToRefs(servicesStore)
 
-const services = ref<TutorService[]>([])
-const isLoading = ref(true)
+const services = computed(() => tutorServices.value)
+const isLoading = computed(() => tutorLoading.value)
 const errorMessage = ref('')
 const successMessage = ref('')
 
@@ -63,20 +58,12 @@ function cancelEdit(): void {
 }
 
 async function loadServices(): Promise<void> {
-  isLoading.value = true
   errorMessage.value = ''
 
   try {
-    const response = await api.get<{ services: TutorService[] }>('/api/tutor/services')
-    services.value = response.data.services ?? []
+    await servicesStore.fetchTutorServices()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to load your services.'
-    } else {
-      errorMessage.value = 'Unable to load your services.'
-    }
-  } finally {
-    isLoading.value = false
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to load your services.'
   }
 }
 
@@ -85,23 +72,21 @@ async function createService(): Promise<void> {
   successMessage.value = ''
 
   try {
-    await api.post('/api/tutor/services', {
+    const payload: TutorServicePayload = {
       title: createForm.title,
       description: createForm.description.trim() === '' ? null : createForm.description,
       duration_minutes: createForm.duration_minutes,
       price: createForm.price,
-    })
+    }
+
+    await servicesStore.createTutorService(payload)
 
     successMessage.value = 'Service created.'
     showCreateForm.value = false
     resetCreateForm()
     await loadServices()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to create service.'
-    } else {
-      errorMessage.value = 'Unable to create service.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to create service.'
   }
 }
 
@@ -110,22 +95,20 @@ async function updateService(serviceId: number): Promise<void> {
   successMessage.value = ''
 
   try {
-    await api.put(`/api/tutor/services/${serviceId}`, {
+    const payload: TutorServicePayload = {
       title: editForm.title,
       description: editForm.description.trim() === '' ? null : editForm.description,
       duration_minutes: editForm.duration_minutes,
       price: editForm.price,
-    })
+    }
+
+    await servicesStore.updateTutorService(serviceId, payload)
 
     successMessage.value = 'Service updated.'
     editingServiceId.value = null
     await loadServices()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to update service.'
-    } else {
-      errorMessage.value = 'Unable to update service.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to update service.'
   }
 }
 
@@ -141,15 +124,11 @@ async function deactivateService(serviceId: number): Promise<void> {
   }
 
   try {
-    await api.delete(`/api/tutor/services/${serviceId}`)
+    await servicesStore.deactivateTutorService(serviceId)
     successMessage.value = 'Service disabled.'
     await loadServices()
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to disable service.'
-    } else {
-      errorMessage.value = 'Unable to disable service.'
-    }
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to disable service.'
   }
 }
 

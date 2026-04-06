@@ -1,47 +1,20 @@
 <script setup lang="ts">
-import axios from 'axios'
+import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import { api } from '@/lib/api'
-
-interface ServiceItem {
-  id: number
-  title: string
-  description: string | null
-  duration_minutes: number
-  price: number
-  tutor_name: string | null
-}
-
-interface TimeslotItem {
-  id: number
-  service_id: number
-  start_time: string
-  end_time: string
-}
+import type { ServiceItem, StudentServicesQuery } from '@/stores/services'
+import { useServicesStore } from '@/stores/services'
+import type { StudentTimeslot } from '@/stores/timeslots'
+import { useTimeslotsStore } from '@/stores/timeslots'
 
 interface ServiceTimeslotState {
   open: boolean
   loading: boolean
   loaded: boolean
   error: string
-  timeslots: TimeslotItem[]
+  timeslots: StudentTimeslot[]
   selectedDate: string
-}
-
-interface PaginationMeta {
-  page: number
-  per_page: number
-  total: number
-  total_pages: number
-  has_prev: boolean
-  has_next: boolean
-}
-
-interface StudentServicesResponse {
-  services: ServiceItem[]
-  pagination?: PaginationMeta
 }
 
 interface ServiceFilters {
@@ -63,33 +36,35 @@ const DEFAULT_FILTERS: ServiceFilters = {
   perPage: String(DEFAULT_PER_PAGE),
 }
 
-const services = ref<ServiceItem[]>([])
-const isLoading = ref(true)
-const errorMessage = ref('')
+const servicesStore = useServicesStore()
+const timeslotsStore = useTimeslotsStore()
+const { studentLoading, studentPagination, studentServices } = storeToRefs(servicesStore)
 
+const services = computed<ServiceItem[]>(() => studentServices.value)
+const isLoading = computed(() => studentLoading.value)
+const pagination = computed(() => ({
+  page: studentPagination.value.page,
+  perPage: studentPagination.value.per_page,
+  total: studentPagination.value.total,
+  totalPages: studentPagination.value.total_pages,
+  hasPrev: studentPagination.value.has_prev,
+  hasNext: studentPagination.value.has_next,
+}))
+
+const errorMessage = ref('')
 const filters = reactive<ServiceFilters>({ ...DEFAULT_FILTERS })
 const modalFilters = reactive<ServiceFilters>({ ...DEFAULT_FILTERS })
 const isFiltersModalOpen = ref(false)
-
-const pagination = reactive({
-  page: 1,
-  perPage: DEFAULT_PER_PAGE,
-  total: 0,
-  totalPages: 1,
-  hasPrev: false,
-  hasNext: false,
-})
-
 const timeslotStates = reactive<Record<number, ServiceTimeslotState>>({})
 
 const resultsSummary = computed(() => {
-  if (pagination.total <= 0 || services.value.length === 0) {
+  if (pagination.value.total <= 0 || services.value.length === 0) {
     return 'No services found for the current filters.'
   }
 
-  const start = (pagination.page - 1) * pagination.perPage + 1
+  const start = (pagination.value.page - 1) * pagination.value.perPage + 1
   const end = start + services.value.length - 1
-  return `Showing ${start}-${end} of ${pagination.total} services`
+  return `Showing ${start}-${end} of ${pagination.value.total} services`
 })
 
 const hasActiveFilters = computed(() => {
@@ -153,11 +128,11 @@ function dateKey(value: string): string {
   return value.slice(0, 10)
 }
 
-function uniqueDateKeys(timeslots: TimeslotItem[]): string[] {
+function uniqueDateKeys(timeslots: StudentTimeslot[]): string[] {
   return [...new Set(timeslots.map((slot) => dateKey(slot.start_time)))]
 }
 
-function slotsForDate(serviceId: number): TimeslotItem[] {
+function slotsForDate(serviceId: number): StudentTimeslot[] {
   const state = ensureState(serviceId)
   if (!state.selectedDate) {
     return state.timeslots
@@ -166,7 +141,7 @@ function slotsForDate(serviceId: number): TimeslotItem[] {
   return state.timeslots.filter((slot) => dateKey(slot.start_time) === state.selectedDate)
 }
 
-function nextThree(serviceId: number): TimeslotItem[] {
+function nextThree(serviceId: number): StudentTimeslot[] {
   const state = ensureState(serviceId)
   return state.timeslots.slice(0, 3)
 }
@@ -223,8 +198,8 @@ function validateFilters(form: ServiceFilters): string | null {
   return null
 }
 
-function buildQueryParams(page: number): Record<string, string | number> {
-  const params: Record<string, string | number> = {
+function buildQueryParams(page: number): StudentServicesQuery {
+  const params: StudentServicesQuery = {
     page,
     per_page: Number(filters.perPage) || DEFAULT_PER_PAGE,
   }
@@ -267,42 +242,14 @@ function pruneTimeslotStates(): void {
   }
 }
 
-async function loadServices(page = pagination.page): Promise<void> {
-  isLoading.value = true
+async function loadServices(page = pagination.value.page): Promise<void> {
   errorMessage.value = ''
 
   try {
-    const response = await api.get<StudentServicesResponse>('/api/student/services', {
-      params: buildQueryParams(page),
-    })
-
-    services.value = response.data.services ?? []
+    await servicesStore.fetchStudentServices(buildQueryParams(page))
     pruneTimeslotStates()
-
-    const responsePagination = response.data.pagination
-    if (responsePagination) {
-      pagination.page = responsePagination.page
-      pagination.perPage = responsePagination.per_page
-      pagination.total = responsePagination.total
-      pagination.totalPages = responsePagination.total_pages
-      pagination.hasPrev = responsePagination.has_prev
-      pagination.hasNext = responsePagination.has_next
-    } else {
-      pagination.page = page
-      pagination.perPage = Number(filters.perPage) || DEFAULT_PER_PAGE
-      pagination.total = services.value.length
-      pagination.totalPages = 1
-      pagination.hasPrev = false
-      pagination.hasNext = false
-    }
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      errorMessage.value = error.response?.data?.error ?? 'Unable to load services.'
-    } else {
-      errorMessage.value = 'Unable to load services.'
-    }
-  } finally {
-    isLoading.value = false
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to load services.'
   }
 }
 
@@ -312,20 +259,14 @@ async function loadServiceTimeslots(serviceId: number): Promise<void> {
   state.error = ''
 
   try {
-    const response = await api.get<{ timeslots: TimeslotItem[] }>(`/api/student/services/${serviceId}/timeslots`)
-    const loadedTimeslots = response.data.timeslots ?? []
-    loadedTimeslots.sort((a, b) => a.start_time.localeCompare(b.start_time))
-
+    const loadedTimeslots = await timeslotsStore.fetchStudentServiceTimeslots(serviceId)
     state.timeslots = loadedTimeslots
     state.loaded = true
+
     const firstTimeslot = loadedTimeslots[0]
     state.selectedDate = firstTimeslot ? dateKey(firstTimeslot.start_time) : ''
   } catch (error: unknown) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      state.error = error.response?.data?.error ?? 'Unable to load timeslots.'
-    } else {
-      state.error = 'Unable to load timeslots.'
-    }
+    state.error = error instanceof Error ? error.message : 'Unable to load timeslots.'
   } finally {
     state.loading = false
   }
@@ -376,19 +317,17 @@ async function applyModalFilters(): Promise<void> {
   }
 
   copyFilters(modalFilters, filters)
-  pagination.page = 1
   closeFiltersModal()
   await loadServices(1)
 }
 
 async function clearActiveFilters(): Promise<void> {
   copyFilters(DEFAULT_FILTERS, filters)
-  pagination.page = 1
   await loadServices(1)
 }
 
 async function goToPage(page: number): Promise<void> {
-  if (isLoading.value || page < 1 || page > pagination.totalPages || page === pagination.page) {
+  if (isLoading.value || page < 1 || page > pagination.value.totalPages || page === pagination.value.page) {
     return
   }
 
