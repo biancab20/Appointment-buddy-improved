@@ -26,6 +26,27 @@ interface IBookingService
         int $perPage
     ): array;
 
+    /**
+     * Tutor views bookings for services they own with filters/pagination.
+     *
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getBookingsForTutorPaginated(
+        int $tutorId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array;
+
+    /**
+     * Tutor calendar date counts for month view.
+     *
+     * @return array<int, array{date: string, count: int}>
+     */
+    public function getTutorDateCountsForMonth(int $tutorId, string $scope, int $year, int $month): array;
+
     /** Admin views all bookings */
     public function getAllBookings(): array;
 
@@ -60,6 +81,14 @@ interface IBookingService
      * @return array{booking: array<string, mixed>, timeslots: array<int, array<string, mixed>>}
      */
     public function getRescheduleOptionsForUser(int $bookingId, int $userId): array;
+
+    /**
+     * Tutor cancels a booked appointment.
+     * Student is always eligible for refund when tutor initiates cancellation.
+     *
+     * @return array{refund_eligible: bool, message: string}
+     */
+    public function cancelBookingForTutor(int $bookingId, int $tutorId): array;
 
     /** Admin dashboard */
     public function countPaidBookings(): int;

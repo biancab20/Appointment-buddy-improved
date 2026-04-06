@@ -26,6 +26,27 @@ interface IBookingRepository
         int $perPage
     ): array;
 
+    /**
+     * Get tutor-owned bookings with scope/date filters and pagination.
+     *
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getForTutorPaginated(
+        int $tutorId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array;
+
+    /**
+     * Get booking counts per date for a tutor month view.
+     *
+     * @return array<int, array{date: string, count: int}>
+     */
+    public function getTutorDateCountsForMonth(int $tutorId, string $scope, int $year, int $month): array;
+
     /** Get all bookings for admin */
     public function getAll(): array;
 
@@ -38,8 +59,14 @@ interface IBookingRepository
     /** Helper: Find booking by id for a specific student*/
     public function findByIdForUser(int $bookingId, int $userId): ?array;
 
+    /** Helper: Find booking by id for a specific tutor (service owner). */
+    public function findByIdForTutor(int $bookingId, int $tutorId): ?array;
+
     /** Student action: Update own paid booking timeslot */
     public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool;
+
+    /** Tutor action: Cancel own paid booking. */
+    public function cancelForTutor(int $bookingId, int $tutorId): bool;
 
     /** Helper: Prevent duplicates by same student */
     public function existsForUserAndTimeslot(int $userId, int $timeslotId): bool;

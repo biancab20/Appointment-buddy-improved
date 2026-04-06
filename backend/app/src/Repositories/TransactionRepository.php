@@ -139,4 +139,23 @@ class TransactionRepository implements ITransactionRepository
 
         return $stmt->rowCount() > 0;
     }
+
+    public function markTutorCancelledByBooking(int $bookingId, string $reason): bool
+    {
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("
+            UPDATE transactions
+            SET status = 'cancelled',
+                failure_reason = :reason
+            WHERE booking_id = :booking_id
+              AND status = 'paid'
+        ");
+        $stmt->execute([
+            ':booking_id' => $bookingId,
+            ':reason' => substr($reason, 0, 255),
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
 }

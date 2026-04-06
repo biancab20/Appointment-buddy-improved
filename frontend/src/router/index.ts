@@ -90,6 +90,12 @@ const router = createRouter({
       meta: { requiresAuth: true, allowedRoles: ['tutor'] },
     },
     {
+      path: '/tutor/bookings',
+      name: 'tutor-bookings',
+      component: () => import('../views/tutor/TutorBookingsView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['tutor'] },
+    },
+    {
       path: '/admin/dashboard',
       name: 'admin-dashboard',
       component: () => import('../views/dashboards/AdminDashboardView.vue'),

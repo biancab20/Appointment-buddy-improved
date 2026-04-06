@@ -8,8 +8,10 @@ use App\Repositories\BookingRepository;
 use App\Repositories\Interfaces\IBookingRepository;
 use App\Repositories\Interfaces\IServiceRepository;
 use App\Repositories\Interfaces\ITimeslotRepository;
+use App\Repositories\Interfaces\ITransactionRepository;
 use App\Repositories\ServiceRepository;
 use App\Repositories\TimeslotRepository;
+use App\Repositories\TransactionRepository;
 use App\Services\Interfaces\IBookingService;
 
 class BookingService implements IBookingService
@@ -19,12 +21,14 @@ class BookingService implements IBookingService
     private IBookingRepository $bookingRepository;
     private ITimeslotRepository $timeslotRepository;
     private IServiceRepository $serviceRepository;
+    private ITransactionRepository $transactionRepository;
 
     public function __construct()
     {
         $this->bookingRepository = new BookingRepository();
         $this->timeslotRepository = new TimeslotRepository();
         $this->serviceRepository = new ServiceRepository();
+        $this->transactionRepository = new TransactionRepository();
     }
 
     public function requestBooking(int $studentId, int $timeslotId): int
@@ -107,6 +111,65 @@ class BookingService implements IBookingService
             $page,
             $perPage
         );
+    }
+
+    public function getBookingsForTutorPaginated(
+        int $tutorId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        if ($tutorId <= 0) {
+            throw new \RuntimeException('Invalid tutor id.');
+        }
+
+        if (!in_array($scope, ['upcoming', 'history'], true)) {
+            throw new \RuntimeException('Invalid scope value.');
+        }
+
+        if ($page <= 0) {
+            throw new \RuntimeException('Page must be greater than 0.');
+        }
+
+        if ($perPage <= 0) {
+            throw new \RuntimeException('Per-page must be greater than 0.');
+        }
+
+        if ($dateFrom !== null && $dateTo !== null && $dateFrom > $dateTo) {
+            throw new \RuntimeException('Date from cannot be greater than date to.');
+        }
+
+        return $this->bookingRepository->getForTutorPaginated(
+            $tutorId,
+            $scope,
+            $dateFrom,
+            $dateTo,
+            $page,
+            $perPage
+        );
+    }
+
+    public function getTutorDateCountsForMonth(int $tutorId, string $scope, int $year, int $month): array
+    {
+        if ($tutorId <= 0) {
+            throw new \RuntimeException('Invalid tutor id.');
+        }
+
+        if (!in_array($scope, ['upcoming', 'history'], true)) {
+            throw new \RuntimeException('Invalid scope value.');
+        }
+
+        if ($year < 1970 || $year > 9999) {
+            throw new \RuntimeException('Invalid year value.');
+        }
+
+        if ($month < 1 || $month > 12) {
+            throw new \RuntimeException('Invalid month value.');
+        }
+
+        return $this->bookingRepository->getTutorDateCountsForMonth($tutorId, $scope, $year, $month);
     }
 
     public function getAllBookings(): array
@@ -289,6 +352,46 @@ class BookingService implements IBookingService
         return [
             'booking' => $booking,
             'timeslots' => array_map(fn(TimeslotModel $t) => $t->toArray(), $timeslots),
+        ];
+    }
+
+    public function cancelBookingForTutor(int $bookingId, int $tutorId): array
+    {
+        if ($bookingId <= 0) {
+            throw new \RuntimeException('Invalid booking id.');
+        }
+
+        if ($tutorId <= 0) {
+            throw new \RuntimeException('Invalid tutor id.');
+        }
+
+        $booking = $this->bookingRepository->findByIdForTutor($bookingId, $tutorId);
+        if (!$booking) {
+            throw new \RuntimeException('Booking not found.');
+        }
+
+        if (($booking['status'] ?? '') === BookingModel::STATUS_CANCELLED) {
+            throw new \RuntimeException('This booking is already cancelled.');
+        }
+
+        $start = $this->parseBookingStart($booking);
+        if ($start <= new \DateTimeImmutable('now')) {
+            throw new \RuntimeException('Past appointments cannot be cancelled.');
+        }
+
+        $cancelled = $this->bookingRepository->cancelForTutor($bookingId, $tutorId);
+        if (!$cancelled) {
+            throw new \RuntimeException('Could not cancel booking.');
+        }
+
+        $this->transactionRepository->markTutorCancelledByBooking(
+            $bookingId,
+            'Tutor cancelled booking. Full refund due to student.'
+        );
+
+        return [
+            'refund_eligible' => true,
+            'message' => 'Booking cancelled by tutor. The student is eligible for a full refund.',
         ];
     }
 

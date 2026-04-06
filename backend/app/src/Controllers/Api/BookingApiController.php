@@ -96,6 +96,121 @@ class BookingApiController extends ApiBaseController
         ]);
     }
 
+    // GET /api/tutor/bookings
+    public function tutorBookings(): void
+    {
+        $this->requireTutor();
+
+        try {
+            $scope = strtolower(trim((string)($_GET['scope'] ?? 'upcoming')));
+            if (!in_array($scope, ['upcoming', 'history'], true)) {
+                throw new \RuntimeException('Invalid scope value.');
+            }
+
+            $page = $this->readRequiredIntQuery('page', 1, 1);
+            $perPage = $this->readRequiredIntQuery('per_page', 6, 1);
+            $perPage = min($perPage, 50);
+
+            $dateFrom = $this->readOptionalDateQuery('date_from');
+            $dateTo = $this->readOptionalDateQuery('date_to');
+
+            $result = $this->bookingService->getBookingsForTutorPaginated(
+                $this->authUserId(),
+                $scope,
+                $dateFrom,
+                $dateTo,
+                $page,
+                $perPage
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $bookings = $result['items'] ?? [];
+        $total = (int)($result['total'] ?? 0);
+        $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+
+        $this->json([
+            'bookings' => $bookings,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_prev' => $page > 1,
+                'has_next' => $page < $totalPages,
+            ],
+            'filters' => [
+                'scope' => $scope,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+        ]);
+    }
+
+    // GET /api/tutor/bookings/calendar
+    public function tutorBookingsCalendar(): void
+    {
+        $this->requireTutor();
+
+        try {
+            $scope = strtolower(trim((string)($_GET['scope'] ?? 'upcoming')));
+            if (!in_array($scope, ['upcoming', 'history'], true)) {
+                throw new \RuntimeException('Invalid scope value.');
+            }
+
+            $now = new \DateTimeImmutable('now');
+            $year = $this->readRequiredIntQuery('year', (int)$now->format('Y'), 1970);
+            $month = $this->readRequiredIntQuery('month', (int)$now->format('n'), 1);
+            if ($month > 12) {
+                throw new \RuntimeException('Invalid month value.');
+            }
+
+            $dateCounts = $this->bookingService->getTutorDateCountsForMonth(
+                $this->authUserId(),
+                $scope,
+                $year,
+                $month
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $this->json([
+            'scope' => $scope,
+            'year' => $year,
+            'month' => $month,
+            'date_counts' => $dateCounts,
+        ]);
+    }
+
+    // DELETE /api/tutor/bookings/{id}
+    public function tutorCancelBooking(array $params): void
+    {
+        $this->requireTutor();
+
+        $bookingId = (int)($params['id'] ?? 0);
+        if ($bookingId <= 0) {
+            $this->json(['error' => 'Invalid booking id.'], 400);
+            return;
+        }
+
+        try {
+            $result = $this->bookingService->cancelBookingForTutor($bookingId, $this->authUserId());
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $this->json([
+            'booking_id' => $bookingId,
+            'refund_eligible' => (bool)$result['refund_eligible'],
+            'message' => (string)$result['message'],
+        ]);
+    }
+
     // DELETE /api/student/bookings/{id}
     public function cancelBooking(array $params): void
     {

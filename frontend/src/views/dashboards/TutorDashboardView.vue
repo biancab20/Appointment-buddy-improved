@@ -96,10 +96,10 @@ onMounted(() => {
           <p>Add, edit, and cancel timeslots for the services you own.</p>
         </RouterLink>
 
-        <article class="action-card action-light">
+        <RouterLink to="/tutor/bookings" class="action-card action-light action-link">
           <h2>Bookings Overview</h2>
           <p>Review booked sessions and cancellations from your timetable.</p>
-        </article>
+        </RouterLink>
       </div>
     </section>
   </main>

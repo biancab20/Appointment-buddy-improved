@@ -22,4 +22,6 @@ interface ITransactionRepository
     public function markFailed(int $transactionId, string $reason): bool;
 
     public function markCancelled(int $transactionId, ?string $reason = null): bool;
+
+    public function markTutorCancelledByBooking(int $bookingId, string $reason): bool;
 }

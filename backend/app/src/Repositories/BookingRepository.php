@@ -176,6 +176,135 @@ class BookingRepository implements IBookingRepository
         ];
     }
 
+    public function getForTutorPaginated(
+        int $tutorId,
+        string $scope,
+        ?string $dateFrom,
+        ?string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        $whereParts = ['s.tutor_id = :tutor_id'];
+        $params = [':tutor_id' => $tutorId];
+
+        if ($scope === 'upcoming') {
+            $whereParts[] = "b.status = 'paid'";
+            $whereParts[] = "t.start_time >= NOW()";
+        } else {
+            $whereParts[] = "(t.start_time < NOW() OR b.status = 'cancelled')";
+        }
+
+        if ($dateFrom !== null) {
+            $whereParts[] = 'DATE(t.start_time) >= :date_from';
+            $params[':date_from'] = $dateFrom;
+        }
+
+        if ($dateTo !== null) {
+            $whereParts[] = 'DATE(t.start_time) <= :date_to';
+            $params[':date_to'] = $dateTo;
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            WHERE {$whereSql}
+        ");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+
+        $orderDirection = $scope === 'upcoming' ? 'ASC' : 'DESC';
+
+        $stmt = $pdo->prepare("
+            SELECT
+                b.id,
+                b.status,
+                b.created_at,
+                b.price_at_booking,
+                b.timeslot_id,
+                t.start_time,
+                t.end_time,
+                s.id AS service_id,
+                s.title AS service_title,
+                u.id AS student_id,
+                u.name AS student_name,
+                u.email AS student_email
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            JOIN users u ON b.student_id = u.id
+            WHERE {$whereSql}
+            ORDER BY t.start_time {$orderDirection}
+            LIMIT :limit OFFSET :offset
+        ");
+
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'total' => $total,
+        ];
+    }
+
+    public function getTutorDateCountsForMonth(int $tutorId, string $scope, int $year, int $month): array
+    {
+        $pdo = Database::getConnection();
+
+        $whereParts = [
+            's.tutor_id = :tutor_id',
+            'YEAR(t.start_time) = :year',
+            'MONTH(t.start_time) = :month',
+        ];
+        $params = [
+            ':tutor_id' => $tutorId,
+            ':year' => $year,
+            ':month' => $month,
+        ];
+
+        if ($scope === 'upcoming') {
+            $whereParts[] = "b.status = 'paid'";
+            $whereParts[] = "t.start_time >= NOW()";
+        } else {
+            $whereParts[] = "(t.start_time < NOW() OR b.status = 'cancelled')";
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $stmt = $pdo->prepare("
+            SELECT
+                DATE(t.start_time) AS booking_date,
+                COUNT(*) AS booking_count
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            WHERE {$whereSql}
+            GROUP BY DATE(t.start_time)
+            ORDER BY DATE(t.start_time) ASC
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(
+            fn(array $row) => [
+                'date' => (string)($row['booking_date'] ?? ''),
+                'count' => (int)($row['booking_count'] ?? 0),
+            ],
+            $rows
+        );
+    }
+
     public function cancelForUser(int $bookingId, int $userId): bool
     {
         $pdo = Database::getConnection();
@@ -269,6 +398,37 @@ class BookingRepository implements IBookingRepository
         return $row ?: null;
     }
 
+    public function findByIdForTutor(int $bookingId, int $tutorId): ?array
+    {
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("
+            SELECT
+                b.id,
+                b.status,
+                b.timeslot_id,
+                b.student_id,
+                b.price_at_booking,
+                t.service_id,
+                t.start_time,
+                t.end_time,
+                s.title AS service_title
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            WHERE b.id = :id
+              AND s.tutor_id = :tutor_id
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':id' => $bookingId,
+            ':tutor_id' => $tutorId,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool
     {
         $pdo = Database::getConnection();
@@ -284,6 +444,27 @@ class BookingRepository implements IBookingRepository
             ':id' => $bookingId,
             ':user_id' => $userId,
         ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function cancelForTutor(int $bookingId, int $tutorId): bool
+    {
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("
+            UPDATE bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            SET b.status = 'cancelled'
+            WHERE b.id = :id
+              AND s.tutor_id = :tutor_id
+              AND b.status = 'paid'
+        ");
+        $stmt->execute([
+            ':id' => $bookingId,
+            ':tutor_id' => $tutorId,
+        ]);
+
         return $stmt->rowCount() > 0;
     }
 
