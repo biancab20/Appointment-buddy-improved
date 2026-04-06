@@ -24,7 +24,7 @@ class BookingService implements IBookingService
     {
         // Prevent same student booking same slot twice
         if ($this->bookingRepository->existsForUserAndTimeslot($studentId, $timeslotId)) {
-            throw new \RuntimeException("You already requested this timeslot.");
+            throw new \RuntimeException("You already booked this timeslot.");
         }
 
         // Prevent two students booking same timeslot
@@ -36,7 +36,7 @@ class BookingService implements IBookingService
             id: null,
             studentId: $studentId,
             timeslotId: $timeslotId,
-            status: 'pending',
+            status: BookingModel::STATUS_PAID,
             createdAt: null
         );
 
@@ -61,7 +61,7 @@ class BookingService implements IBookingService
             throw new \RuntimeException("Booking not found.");
         }
 
-        if ($booking['status'] === 'cancelled' || $booking['status'] === 'declined') {
+        if ($booking['status'] === BookingModel::STATUS_CANCELLED) {
             throw new \RuntimeException("This booking is already cancelled.");
         }
 
@@ -90,26 +90,27 @@ class BookingService implements IBookingService
         return $this->bookingRepository->findByIdForUser($bookingId, $userId);
     }
 
-    public function updateTimeslotForPending(int $bookingId, int $userId, int $newTimeslotId): bool
+    public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool
     {
-        return $this->bookingRepository->updateTimeslotForPending($bookingId, $userId, $newTimeslotId);
+        return $this->bookingRepository->updateTimeslotForPaid($bookingId, $userId, $newTimeslotId);
     }
-    public function changePendingBookingTimeslot(int $bookingId, int $userId, int $newTimeslotId): void
+
+    public function changePaidBookingTimeslot(int $bookingId, int $userId, int $newTimeslotId): void
     {
         $booking = $this->bookingRepository->findByIdForUser($bookingId, $userId);
         if (!$booking) {
             throw new \RuntimeException("Booking not found.");
         }
 
-        if ($booking['status'] !== 'pending') {
-            throw new \RuntimeException("Only pending bookings can be changed.");
+        if ($booking['status'] !== BookingModel::STATUS_PAID) {
+            throw new \RuntimeException("Only paid bookings can be changed.");
         }
 
         if ((int) $booking['timeslot_id'] === $newTimeslotId) {
             throw new \RuntimeException("Please select a different timeslot.");
         }
 
-        // block pending/approved timeslot
+        // block already booked timeslot
         if ($this->bookingRepository->existsActiveForTimeslot($newTimeslotId)) {
             throw new \RuntimeException("That timeslot is no longer available.");
         }
@@ -124,14 +125,14 @@ class BookingService implements IBookingService
             throw new \RuntimeException("Invalid timeslot selection for this service.");
         }
 
-        $ok = $this->bookingRepository->updateTimeslotForPending($bookingId, $userId, $newTimeslotId);
+        $ok = $this->bookingRepository->updateTimeslotForPaid($bookingId, $userId, $newTimeslotId);
         if (!$ok) {
             throw new \RuntimeException("Could not change booking timeslot.");
         }
     }
 
-    public function countPendingBookings(): int
+    public function countPaidBookings(): int
     {
-        return $this->bookingRepository->countPending();
+        return $this->bookingRepository->countPaid();
     }
 }

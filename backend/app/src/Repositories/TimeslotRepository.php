@@ -55,7 +55,7 @@ class TimeslotRepository implements ITimeslotRepository
                 SELECT 1
                 FROM bookings b
                 WHERE b.timeslot_id = t.id
-                AND b.status IN ('pending', 'approved')
+                AND b.status = 'paid'
               )
             ORDER BY t.start_time ASC
         ");
@@ -98,7 +98,7 @@ class TimeslotRepository implements ITimeslotRepository
             SELECT 1
             FROM bookings b
             WHERE b.timeslot_id = t.id
-              AND b.status IN ('pending', 'approved')
+              AND b.status = 'paid'
           )
     ");
 

@@ -6,7 +6,7 @@ use App\Models\BookingModel;
 
 interface IBookingService
 {
-    /** Student requests a booking (usually status = pending) */
+    /** Student creates a booking (status = paid) */
     public function requestBooking(int $studentId, int $timeslotId): int;
 
     /** Student views own bookings */
@@ -21,18 +21,18 @@ interface IBookingService
     /** Find booking by id for a specific user when he wants to change the timeslot */
     public function findByIdForUser(int $bookingId, int $userId): ?array;
 
-    /** Update timeslot when user changes/updated a booking */
-    public function updateTimeslotForPending(int $bookingId, int $userId, int $newTimeslotId): bool;
-    
-    /** Admin approves/cancels */
+    /** Update timeslot for own paid booking */
+    public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool;
+
+    /** Admin updates status */
     public function updateBookingStatus(int $bookingId, string $status): bool;
 
     /** Dashboard */
     public function countUpcomingForUser(int $userId): int;
 
-    /** User changes timeslot for booking */
-    public function changePendingBookingTimeslot(int $bookingId, int $userId, int $newTimeslotId): void;
+    /** User changes timeslot for paid booking */
+    public function changePaidBookingTimeslot(int $bookingId, int $userId, int $newTimeslotId): void;
 
     /** Admin dashboard */
-    public function countPendingBookings(): int;
+    public function countPaidBookings(): int;
 }

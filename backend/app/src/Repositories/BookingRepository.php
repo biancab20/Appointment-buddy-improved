@@ -58,7 +58,7 @@ class BookingRepository implements IBookingRepository
             FROM bookings b
             JOIN timeslots t ON b.timeslot_id = t.id
             WHERE b.student_id = :id
-              AND b.status = 'approved'
+              AND b.status = 'paid'
               AND t.start_time > NOW()
         ");
 
@@ -122,7 +122,7 @@ class BookingRepository implements IBookingRepository
             FROM bookings
             WHERE student_id = :user_id
               AND timeslot_id = :timeslot_id
-              AND status IN ('pending','approved')
+              AND status = 'paid'
         ");
 
         $stmt->execute([
@@ -140,7 +140,7 @@ class BookingRepository implements IBookingRepository
         SELECT COUNT(*)
         FROM bookings
         WHERE timeslot_id = :timeslot_id
-          AND status IN ('pending', 'approved')
+          AND status = 'paid'
     ");
 
         $stmt->execute([':timeslot_id' => $timeslotId]);
@@ -150,7 +150,7 @@ class BookingRepository implements IBookingRepository
     public function updateStatus(int $bookingId, string $status): bool
     {
         // keep allowed statuses tight
-        $allowed = ['pending', 'approved', 'cancelled', 'declined'];
+        $allowed = ['paid', 'cancelled'];
         if (!in_array($status, $allowed, true)) {
             throw new \InvalidArgumentException("Invalid status: $status");
         }
@@ -186,7 +186,7 @@ class BookingRepository implements IBookingRepository
         return $row ?: null;
     }
 
-    public function updateTimeslotForPending(int $bookingId, int $userId, int $newTimeslotId): bool
+    public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("
@@ -194,7 +194,7 @@ class BookingRepository implements IBookingRepository
         SET timeslot_id = :new_timeslot_id
         WHERE id = :id
           AND student_id = :user_id
-          AND status = 'pending'
+          AND status = 'paid'
     ");
         $stmt->execute([
             ':new_timeslot_id' => $newTimeslotId,
@@ -212,36 +212,36 @@ class BookingRepository implements IBookingRepository
         SELECT COUNT(*)
         FROM bookings
         WHERE timeslot_id = :timeslot_id
-          AND status IN ('pending', 'approved')
+          AND status = 'paid'
     ");
         $stmt->execute([':timeslot_id' => $timeslotId]);
 
         return (int) $stmt->fetchColumn();
     }
 
-    public function declineActiveForTimeslot(int $timeslotId): int
+    public function cancelPaidForTimeslot(int $timeslotId): int
     {
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("
         UPDATE bookings
-        SET status = 'declined'
+        SET status = 'cancelled'
         WHERE timeslot_id = :timeslot_id
-          AND status IN ('pending', 'approved')
+          AND status = 'paid'
     ");
         $stmt->execute([':timeslot_id' => $timeslotId]);
 
         return $stmt->rowCount();
     }
 
-    public function countPending(): int
+    public function countPaid(): int
     {
         $pdo = Database::getConnection();
 
         $stmt = $pdo->query("
         SELECT COUNT(*)
         FROM bookings
-        WHERE status = 'pending'
+        WHERE status = 'paid'
     ");
 
         return (int) $stmt->fetchColumn();

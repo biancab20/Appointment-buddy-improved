@@ -43,7 +43,7 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('PUT', '/api/tutor/timeslots/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorUpdateTimeslot']);
     $r->addRoute('DELETE', '/api/tutor/timeslots/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorDeleteTimeslot']);
 
-    $r->addRoute('GET', '/api/admin/bookings/pending', ['App\\Controllers\\Api\\BookingApiController', 'pending']);
+    $r->addRoute('GET', '/api/admin/bookings/paid', ['App\\Controllers\\Api\\BookingApiController', 'paid']);
 });
 
 $httpMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';

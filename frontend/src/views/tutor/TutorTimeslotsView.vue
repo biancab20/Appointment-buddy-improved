@@ -173,19 +173,21 @@ async function deactivateTimeslot(timeslotId: number): Promise<void> {
   successMessage.value = ''
 
   const shouldContinue = window.confirm(
-    'Deactivate this timeslot? Pending/approved bookings will be set to declined.',
+    'Deactivate this timeslot? Paid bookings for this slot will be cancelled.',
   )
   if (!shouldContinue) {
     return
   }
 
   try {
-    const response = await api.delete<{ declined_bookings_count?: number }>(`/api/tutor/timeslots/${timeslotId}`)
-    const declined = Number(response.data.declined_bookings_count ?? 0)
+    const response = await api.delete<{ cancelled_bookings_count?: number }>(
+      `/api/tutor/timeslots/${timeslotId}`,
+    )
+    const cancelled = Number(response.data.cancelled_bookings_count ?? 0)
 
     successMessage.value =
-      declined > 0
-        ? `Timeslot deactivated. ${declined} booking(s) were automatically declined.`
+      cancelled > 0
+        ? `Timeslot deactivated. ${cancelled} booking(s) were automatically cancelled.`
         : 'Timeslot deactivated.'
 
     await loadTimeslots()

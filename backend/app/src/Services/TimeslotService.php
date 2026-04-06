@@ -61,9 +61,9 @@ class TimeslotService implements ITimeslotService
 
     public function updateTimeslot(int $timeslotId, string $start, string $end): void
     {
-        // block update if pending/approved exists
+        // block update if a paid booking exists
         if ($this->bookingRepository->countActiveForTimeslot($timeslotId) > 0) {
-            throw new \RuntimeException("Cannot update: this timeslot has a pending/approved booking.");
+            throw new \RuntimeException("Cannot update: this timeslot has a paid booking.");
         }
 
         $existing = $this->timeslotRepository->find($timeslotId);
@@ -92,12 +92,12 @@ class TimeslotService implements ITimeslotService
 
     public function deactivateTimeslot(int $timeslotId): int
     {
-        // If pending/approved exists: decline them and inform admin
-        $declinedCount = $this->bookingRepository->declineActiveForTimeslot($timeslotId);
+        // If paid bookings exist: cancel them.
+        $cancelledCount = $this->bookingRepository->cancelPaidForTimeslot($timeslotId);
 
         $this->timeslotRepository->setActive($timeslotId, false);
 
-        return $declinedCount;
+        return $cancelledCount;
     }
 
     public function activateTimeslot(int $timeslotId): void

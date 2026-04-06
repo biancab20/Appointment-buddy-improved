@@ -278,11 +278,11 @@ class ServiceApiController extends ApiBaseController
             return;
         }
 
-        $declinedBookingsCount = $this->timeslotService->deactivateTimeslot((int)$timeslot->id);
+        $cancelledBookingsCount = $this->timeslotService->deactivateTimeslot((int)$timeslot->id);
 
         $this->json([
             'message' => 'Timeslot deactivated successfully.',
-            'declined_bookings_count' => $declinedBookingsCount,
+            'cancelled_bookings_count' => $cancelledBookingsCount,
         ]);
     }
 

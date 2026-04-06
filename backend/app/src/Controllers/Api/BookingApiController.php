@@ -14,16 +14,16 @@ class BookingApiController extends ApiBaseController
         $this->bookingService = new BookingService();
     }
 
-    // GET /api/admin/bookings/pending
-    public function pending(): void
+    // GET /api/admin/bookings/paid
+    public function paid(): void
     {
         $this->requireAdmin();
 
         $all = $this->bookingService->getAllBookings();
-        $pending = array_values(array_filter($all, fn($b) => ($b['status'] ?? '') === 'pending'));
+        $paid = array_values(array_filter($all, fn($b) => ($b['status'] ?? '') === 'paid'));
 
         $this->json([
-            'pending' => $pending
+            'paid' => $paid
         ]);
     }
 }

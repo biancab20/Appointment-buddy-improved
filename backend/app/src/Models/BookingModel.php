@@ -4,11 +4,14 @@ namespace App\Models;
 
 final class BookingModel
 {
+    public const STATUS_PAID = 'paid';
+    public const STATUS_CANCELLED = 'cancelled';
+
     public function __construct(
         public ?int $id,
         public int $studentId,
         public int $timeslotId,
-        public string $status = 'pending',
+        public string $status = self::STATUS_PAID,
         public ?string $createdAt = null
     ) {}
 
@@ -18,14 +21,14 @@ final class BookingModel
             id: isset($row['id']) ? (int)$row['id'] : null,
             studentId: (int)($row['student_id'] ?? 0),
             timeslotId: (int)($row['timeslot_id'] ?? 0),
-            status: (string)($row['status'] ?? 'pending'),
+            status: (string)($row['status'] ?? self::STATUS_PAID),
             createdAt: $row['created_at'] ?? null
         );
     }
 
     public function isCancelled(): bool
     {
-        return $this->status === 'cancelled';
+        return $this->status === self::STATUS_CANCELLED;
     }
 
     public function toArray(): array

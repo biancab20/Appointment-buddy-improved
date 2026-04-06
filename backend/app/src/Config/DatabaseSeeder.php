@@ -60,7 +60,7 @@ $queries = [
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         timeslot_id INT NOT NULL,
-        status ENUM('pending','approved','cancelled', 'declined') NOT NULL DEFAULT 'pending',
+        status ENUM('paid','cancelled') NOT NULL DEFAULT 'paid',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (student_id) REFERENCES users(id),
         FOREIGN KEY (timeslot_id) REFERENCES timeslots(id)
@@ -185,6 +185,27 @@ if ($nullTutorOwnerCount === 0) {
         ");
     }
 }
+
+// Keep bookings.status in sync for existing databases.
+$pdo->exec("
+    ALTER TABLE bookings
+    MODIFY COLUMN status ENUM('pending','approved','cancelled','declined','paid') NOT NULL DEFAULT 'pending'
+");
+
+$pdo->exec("
+    UPDATE bookings
+    SET status = CASE
+        WHEN status = 'approved' THEN 'paid'
+        WHEN status = 'pending' THEN 'paid'
+        WHEN status = 'declined' THEN 'cancelled'
+        ELSE status
+    END
+");
+
+$pdo->exec("
+    ALTER TABLE bookings
+    MODIFY COLUMN status ENUM('paid','cancelled') NOT NULL DEFAULT 'paid'
+");
 
 echo "Tables ensured.\n";
 

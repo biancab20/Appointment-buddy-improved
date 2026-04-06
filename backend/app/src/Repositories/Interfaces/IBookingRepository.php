@@ -6,7 +6,7 @@ use App\Models\BookingModel;
 
 interface IBookingRepository
 {
-    /** Create new booking */ 
+    /** Create new booking */
     public function create(BookingModel $booking): int;
 
     /** Get all bookings for a specific student */
@@ -15,7 +15,7 @@ interface IBookingRepository
     /** Get all bookings for admin */
     public function getAll(): array;
 
-    /** Admin action: Approve/cancel */
+    /** Admin action: update booking status */
     public function updateStatus(int $bookingId, string $status): bool;
 
     /** Student action: Cancel own booking */
@@ -24,8 +24,8 @@ interface IBookingRepository
     /** Helper: Find booking by id for a specific student*/
     public function findByIdForUser(int $bookingId, int $userId): ?array;
 
-    /** Student action: Update his own booking timeslot*/
-    public function updateTimeslotForPending(int $bookingId, int $userId, int $newTimeslotId): bool;
+    /** Student action: Update own paid booking timeslot */
+    public function updateTimeslotForPaid(int $bookingId, int $userId, int $newTimeslotId): bool;
 
     /** Helper: Prevent duplicates by same student */
     public function existsForUserAndTimeslot(int $userId, int $timeslotId): bool;
@@ -39,9 +39,9 @@ interface IBookingRepository
     /** Helper: Count active timeslots */
     public function countActiveForTimeslot(int $timeslotId): int;
 
-    /** Helper: Mark booking as declined for a specific timeslot*/
-    public function declineActiveForTimeslot(int $timeslotId): int;
+    /** Helper: Mark paid bookings as cancelled for a specific timeslot */
+    public function cancelPaidForTimeslot(int $timeslotId): int;
 
-    /** Admin dashboard: Count pending bookings */
-    public function countPending(): int;
+    /** Admin dashboard: Count paid bookings */
+    public function countPaid(): int;
 }
