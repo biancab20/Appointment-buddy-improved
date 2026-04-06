@@ -1,7 +1,15 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { RouterLink, RouterView } from 'vue-router'
 
 import brandLogo from '@/assets/images/logo.png'
+import Error401View from '@/views/errors/Error401View.vue'
+import Error403View from '@/views/errors/Error403View.vue'
+
+import { useAccessStore } from './stores/access'
+
+const accessStore = useAccessStore()
+const { errorCode } = storeToRefs(accessStore)
 </script>
 
 <template>
@@ -18,7 +26,9 @@ import brandLogo from '@/assets/images/logo.png'
       </nav>
     </header>
 
-    <RouterView />
+    <Error401View v-if="errorCode === 401" />
+    <Error403View v-else-if="errorCode === 403" />
+    <RouterView v-else />
 
     <footer class="app-footer">
       <span>&copy; {{ new Date().getFullYear() }} Appointment Buddy</span>

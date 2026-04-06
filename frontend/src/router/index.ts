@@ -1,4 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+import { useAccessStore } from '@/stores/access'
+import { useAuthStore } from '@/stores/auth'
+
 import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
@@ -12,12 +16,45 @@ const router = createRouter({
     {
       path: '/about',
       name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('../views/errors/Error404View.vue'),
+    },
   ],
+})
+
+router.beforeEach((to) => {
+  const accessStore = useAccessStore()
+  accessStore.clearError()
+
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
+  if (!requiresAuth) {
+    return true
+  }
+
+  const authStore = useAuthStore()
+  if (!authStore.isAuthenticated) {
+    accessStore.setError(401)
+    return false
+  }
+
+  const allowedRoles = to.matched.flatMap((record) => {
+    if (!Array.isArray(record.meta.allowedRoles)) {
+      return []
+    }
+
+    return record.meta.allowedRoles.filter((role): role is string => typeof role === 'string')
+  })
+
+  if (allowedRoles.length > 0 && (!authStore.role || !allowedRoles.includes(authStore.role))) {
+    accessStore.setError(403)
+    return false
+  }
+
+  return true
 })
 
 export default router
