@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BookingModel;
+use App\Models\TimeslotModel;
 use App\Repositories\BookingRepository;
 use App\Repositories\Interfaces\IBookingRepository;
 use App\Repositories\Interfaces\IServiceRepository;
@@ -13,6 +14,8 @@ use App\Services\Interfaces\IBookingService;
 
 class BookingService implements IBookingService
 {
+    private const POLICY_WINDOW_SECONDS = 48 * 60 * 60;
+
     private IBookingRepository $bookingRepository;
     private ITimeslotRepository $timeslotRepository;
     private IServiceRepository $serviceRepository;
@@ -113,24 +116,47 @@ class BookingService implements IBookingService
 
     public function cancelBookingForUser(int $bookingId, int $userId): bool
     {
+        $this->cancelBookingWithPolicyForUser($bookingId, $userId);
+        return true;
+    }
+
+    public function cancelBookingWithPolicyForUser(int $bookingId, int $userId): array
+    {
         $booking = $this->bookingRepository->findByIdForUser($bookingId, $userId);
 
         if (!$booking) {
             throw new \RuntimeException("Booking not found.");
         }
 
-        if ($booking['status'] === BookingModel::STATUS_CANCELLED) {
+        if (($booking['status'] ?? '') === BookingModel::STATUS_CANCELLED) {
             throw new \RuntimeException("This booking is already cancelled.");
         }
 
-        $start = new \DateTimeImmutable($booking['start_time']);
+        $start = $this->parseBookingStart($booking);
         $now = new \DateTimeImmutable('now');
 
         if ($start <= $now) {
             throw new \RuntimeException("Past appointments cannot be cancelled.");
         }
 
-        return $this->bookingRepository->cancelForUser($bookingId, $userId);
+        $refundEligible = $this->secondsUntil($start, $now) >= self::POLICY_WINDOW_SECONDS;
+
+        $cancelled = $this->bookingRepository->cancelForUser($bookingId, $userId);
+        if (!$cancelled) {
+            throw new \RuntimeException("Could not cancel booking.");
+        }
+
+        if ($refundEligible) {
+            return [
+                'refund_eligible' => true,
+                'message' => 'Booking cancelled. You are eligible for a refund. The amount will be returned within a few working days.',
+            ];
+        }
+
+        return [
+            'refund_eligible' => false,
+            'message' => 'Booking cancelled. Because this cancellation was made less than 48 hours before the session, no refund will be issued.',
+        ];
     }
 
     public function updateBookingStatus(int $bookingId, string $status): bool
@@ -164,23 +190,52 @@ class BookingService implements IBookingService
             throw new \RuntimeException("Only paid bookings can be changed.");
         }
 
+        $start = $this->parseBookingStart($booking);
+        $now = new \DateTimeImmutable('now');
+        if ($start <= $now) {
+            throw new \RuntimeException("Past appointments cannot be rescheduled.");
+        }
+
+        if ($this->secondsUntil($start, $now) < self::POLICY_WINDOW_SECONDS) {
+            throw new \RuntimeException(
+                "Rescheduling is only allowed more than 48 hours before the session. The timeframe is too short to notify the tutor or fill this timeslot. You can still cancel if you cannot attend."
+            );
+        }
+
+        $service = $this->serviceRepository->find((int)$booking['service_id']);
+        if (!$service) {
+            throw new \RuntimeException("Service not found.");
+        }
+
+        $priceAtBooking = (float)($booking['price_at_booking'] ?? 0);
+        $currentPrice = (float)$service->price;
+        if ($currentPrice > ($priceAtBooking + 0.00001)) {
+            throw new \RuntimeException(
+                "This service price has increased since you booked. Rescheduling is not available for this booking."
+            );
+        }
+
         if ((int) $booking['timeslot_id'] === $newTimeslotId) {
             throw new \RuntimeException("Please select a different timeslot.");
+        }
+
+        $newTimeslot = $this->timeslotRepository->find($newTimeslotId);
+        if (!$newTimeslot || !$newTimeslot->isActive) {
+            throw new \RuntimeException("That timeslot is no longer available.");
+        }
+
+        $newStart = new \DateTimeImmutable($newTimeslot->startTime);
+        if ($newStart <= $now) {
+            throw new \RuntimeException("Past timeslots cannot be selected.");
+        }
+
+        if ((int)$newTimeslot->serviceId !== (int)$booking['service_id']) {
+            throw new \RuntimeException("Invalid timeslot selection for this service.");
         }
 
         // block already booked timeslot
         if ($this->bookingRepository->existsActiveForTimeslot($newTimeslotId)) {
             throw new \RuntimeException("That timeslot is no longer available.");
-        }
-
-        // validate new timeslot belongs to same service
-        $newServiceId = $this->timeslotRepository->getServiceIdForTimeslot($newTimeslotId);
-        if ($newServiceId === null) {
-            throw new \RuntimeException("Selected timeslot does not exist.");
-        }
-
-        if ((int) $newServiceId !== (int) $booking['service_id']) {
-            throw new \RuntimeException("Invalid timeslot selection for this service.");
         }
 
         $ok = $this->bookingRepository->updateTimeslotForPaid($bookingId, $userId, $newTimeslotId);
@@ -189,8 +244,66 @@ class BookingService implements IBookingService
         }
     }
 
+    public function getRescheduleOptionsForUser(int $bookingId, int $userId): array
+    {
+        $booking = $this->bookingRepository->findByIdForUser($bookingId, $userId);
+        if (!$booking) {
+            throw new \RuntimeException("Booking not found.");
+        }
+
+        if (($booking['status'] ?? '') !== BookingModel::STATUS_PAID) {
+            throw new \RuntimeException("Only paid bookings can be rescheduled.");
+        }
+
+        $start = $this->parseBookingStart($booking);
+        $now = new \DateTimeImmutable('now');
+        if ($start <= $now) {
+            throw new \RuntimeException("Past appointments cannot be rescheduled.");
+        }
+
+        if ($this->secondsUntil($start, $now) < self::POLICY_WINDOW_SECONDS) {
+            throw new \RuntimeException(
+                "Rescheduling is only allowed more than 48 hours before the session. The timeframe is too short to notify the tutor or fill this timeslot. You can still cancel if you cannot attend."
+            );
+        }
+
+        $service = $this->serviceRepository->find((int)$booking['service_id']);
+        if (!$service) {
+            throw new \RuntimeException("Service not found.");
+        }
+
+        $priceAtBooking = (float)($booking['price_at_booking'] ?? 0);
+        $currentPrice = (float)$service->price;
+        if ($currentPrice > ($priceAtBooking + 0.00001)) {
+            throw new \RuntimeException(
+                "This service price has increased since you booked. Rescheduling is not available for this booking."
+            );
+        }
+
+        $timeslots = $this->timeslotRepository->getUpcomingForService((int)$booking['service_id']);
+        $timeslots = array_values(array_filter(
+            $timeslots,
+            fn(TimeslotModel $t) => (int)$t->id !== (int)$booking['timeslot_id']
+        ));
+
+        return [
+            'booking' => $booking,
+            'timeslots' => array_map(fn(TimeslotModel $t) => $t->toArray(), $timeslots),
+        ];
+    }
+
     public function countPaidBookings(): int
     {
         return $this->bookingRepository->countPaid();
+    }
+
+    private function parseBookingStart(array $booking): \DateTimeImmutable
+    {
+        return new \DateTimeImmutable((string)($booking['start_time'] ?? 'now'));
+    }
+
+    private function secondsUntil(\DateTimeImmutable $start, \DateTimeImmutable $now): int
+    {
+        return $start->getTimestamp() - $now->getTimestamp();
     }
 }

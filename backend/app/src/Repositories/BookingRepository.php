@@ -258,7 +258,7 @@ class BookingRepository implements IBookingRepository
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("
-        SELECT b.id, b.status, b.timeslot_id, t.service_id, t.start_time
+        SELECT b.id, b.status, b.timeslot_id, b.price_at_booking, t.service_id, t.start_time
         FROM bookings b
         JOIN timeslots t ON b.timeslot_id = t.id
         WHERE b.id = :id AND b.student_id = :user_id

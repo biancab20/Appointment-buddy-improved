@@ -96,6 +96,97 @@ class BookingApiController extends ApiBaseController
         ]);
     }
 
+    // DELETE /api/student/bookings/{id}
+    public function cancelBooking(array $params): void
+    {
+        $this->requireStudent();
+
+        $bookingId = (int)($params['id'] ?? 0);
+        if ($bookingId <= 0) {
+            $this->json(['error' => 'Invalid booking id.'], 400);
+            return;
+        }
+
+        try {
+            $result = $this->bookingService->cancelBookingWithPolicyForUser(
+                $bookingId,
+                $this->authUserId()
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $this->json([
+            'booking_id' => $bookingId,
+            'refund_eligible' => (bool)$result['refund_eligible'],
+            'message' => (string)$result['message'],
+        ]);
+    }
+
+    // GET /api/student/bookings/{id}/reschedule-options
+    public function rescheduleOptions(array $params): void
+    {
+        $this->requireStudent();
+
+        $bookingId = (int)($params['id'] ?? 0);
+        if ($bookingId <= 0) {
+            $this->json(['error' => 'Invalid booking id.'], 400);
+            return;
+        }
+
+        try {
+            $result = $this->bookingService->getRescheduleOptionsForUser(
+                $bookingId,
+                $this->authUserId()
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $this->json([
+            'booking' => $result['booking'],
+            'timeslots' => $result['timeslots'],
+        ]);
+    }
+
+    // PUT /api/student/bookings/{id}/reschedule
+    public function rescheduleBooking(array $params): void
+    {
+        $this->requireStudent();
+
+        $bookingId = (int)($params['id'] ?? 0);
+        if ($bookingId <= 0) {
+            $this->json(['error' => 'Invalid booking id.'], 400);
+            return;
+        }
+
+        $payload = $this->readJsonBody();
+        $newTimeslotId = (int)($payload['new_timeslot_id'] ?? 0);
+        if ($newTimeslotId <= 0) {
+            $this->json(['error' => 'Invalid new timeslot id.'], 400);
+            return;
+        }
+
+        try {
+            $this->bookingService->changePaidBookingTimeslot(
+                $bookingId,
+                $this->authUserId(),
+                $newTimeslotId
+            );
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+            return;
+        }
+
+        $this->json([
+            'booking_id' => $bookingId,
+            'new_timeslot_id' => $newTimeslotId,
+            'message' => 'Booking rescheduled successfully.',
+        ]);
+    }
+
     // POST /api/student/bookings/checkout-session
     public function createCheckoutSession(): void
     {

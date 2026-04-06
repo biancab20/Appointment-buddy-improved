@@ -3,13 +3,30 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
-import type { BookingScope, StudentBooking, StudentBookingsQuery } from '@/stores/bookings'
+import type {
+  BookingScope,
+  RescheduleOption,
+  StudentBooking,
+  StudentBookingsQuery,
+} from '@/stores/bookings'
 import { useBookingsStore } from '@/stores/bookings'
 
 interface BookingFilters {
   dateFrom: string
   dateTo: string
   perPage: string
+}
+
+interface RescheduleState {
+  open: boolean
+  bookingId: number | null
+  serviceTitle: string
+  loading: boolean
+  submitting: boolean
+  error: string
+  timeslots: RescheduleOption[]
+  selectedDate: string
+  selectedTimeslotId: number | null
 }
 
 const DEFAULT_PER_PAGE = 6
@@ -26,6 +43,20 @@ const { studentBookings, studentLoading, studentPagination } = storeToRefs(booki
 const scope = ref<BookingScope>('upcoming')
 const filters = reactive<BookingFilters>({ ...DEFAULT_FILTERS })
 const errorMessage = ref('')
+const successMessage = ref('')
+const actionLoadingByBooking = reactive<Record<number, boolean>>({})
+
+const reschedule = reactive<RescheduleState>({
+  open: false,
+  bookingId: null,
+  serviceTitle: '',
+  loading: false,
+  submitting: false,
+  error: '',
+  timeslots: [],
+  selectedDate: '',
+  selectedTimeslotId: null,
+})
 
 const bookings = computed<StudentBooking[]>(() => studentBookings.value)
 const isLoading = computed(() => studentLoading.value)
@@ -105,6 +136,15 @@ function isPast(value: string): boolean {
   return date.getTime() < Date.now()
 }
 
+function hoursUntil(value: string): number {
+  const date = parseDateTime(value)
+  if (Number.isNaN(date.getTime())) {
+    return 0
+  }
+
+  return (date.getTime() - Date.now()) / 3600000
+}
+
 function statusLabel(booking: StudentBooking): string {
   if (booking.status === 'cancelled') {
     return 'Cancelled'
@@ -129,12 +169,40 @@ function statusClass(booking: StudentBooking): string {
   return 'status-paid'
 }
 
+function policyHint(booking: StudentBooking): string {
+  const hours = hoursUntil(booking.start_time)
+  if (hours < 48) {
+    return 'Less than 48h before session: reschedule is unavailable and cancellation does not qualify for refund.'
+  }
+
+  return 'More than 48h before session: you can reschedule or cancel with refund.'
+}
+
+function canManageBooking(booking: StudentBooking): boolean {
+  return scope.value === 'upcoming' && booking.status === 'paid' && !isPast(booking.start_time)
+}
+
+function isActionLoading(bookingId: number): boolean {
+  return actionLoadingByBooking[bookingId] === true
+}
+
+function setActionLoading(bookingId: number, loading: boolean): void {
+  actionLoadingByBooking[bookingId] = loading
+}
+
 function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false
   }
 
-  const [year, month, day] = value.split('-').map((part) => Number(part))
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false
+  }
+
   const check = new Date(year, month - 1, day)
   return (
     check.getFullYear() === year &&
@@ -203,6 +271,7 @@ async function switchScope(nextScope: BookingScope): Promise<void> {
   }
 
   scope.value = nextScope
+  successMessage.value = ''
   await loadBookings(1)
 }
 
@@ -231,6 +300,143 @@ async function goToPage(page: number): Promise<void> {
   await loadBookings(page)
 }
 
+function dateKey(value: string): string {
+  return value.slice(0, 10)
+}
+
+function uniqueDateKeys(timeslots: RescheduleOption[]): string[] {
+  return [...new Set(timeslots.map((slot) => dateKey(slot.start_time)))]
+}
+
+function rescheduleSlotsForDate(): RescheduleOption[] {
+  if (!reschedule.selectedDate) {
+    return reschedule.timeslots
+  }
+
+  return reschedule.timeslots.filter((slot) => dateKey(slot.start_time) === reschedule.selectedDate)
+}
+
+function nextThreeRescheduleSlots(): RescheduleOption[] {
+  return reschedule.timeslots.slice(0, 3)
+}
+
+function selectRescheduleTimeslot(timeslotId: number): void {
+  reschedule.selectedTimeslotId = timeslotId
+  reschedule.error = ''
+}
+
+function selectNextRescheduleSlot(slot: RescheduleOption): void {
+  reschedule.selectedDate = dateKey(slot.start_time)
+  selectRescheduleTimeslot(slot.id)
+}
+
+function closeRescheduleModal(): void {
+  reschedule.open = false
+  reschedule.bookingId = null
+  reschedule.serviceTitle = ''
+  reschedule.loading = false
+  reschedule.submitting = false
+  reschedule.error = ''
+  reschedule.timeslots = []
+  reschedule.selectedDate = ''
+  reschedule.selectedTimeslotId = null
+}
+
+async function openRescheduleModal(booking: StudentBooking): Promise<void> {
+  if (isActionLoading(booking.id)) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  setActionLoading(booking.id, true)
+
+  reschedule.open = true
+  reschedule.bookingId = booking.id
+  reschedule.serviceTitle = booking.service_title
+  reschedule.loading = true
+  reschedule.submitting = false
+  reschedule.error = ''
+  reschedule.timeslots = []
+  reschedule.selectedDate = ''
+  reschedule.selectedTimeslotId = null
+
+  try {
+    const options = await bookingsStore.fetchRescheduleOptions(booking.id)
+    reschedule.timeslots = options
+
+    if (options.length === 0) {
+      reschedule.error = 'No alternative timeslots are currently available.'
+      return
+    }
+
+    const firstOption = options[0]
+    if (!firstOption) {
+      reschedule.error = 'No alternative timeslots are currently available.'
+      return
+    }
+
+    reschedule.selectedDate = dateKey(firstOption.start_time)
+  } catch (error: unknown) {
+    reschedule.error = error instanceof Error ? error.message : 'Unable to load reschedule options.'
+  } finally {
+    reschedule.loading = false
+    setActionLoading(booking.id, false)
+  }
+}
+
+async function submitReschedule(): Promise<void> {
+  if (!reschedule.bookingId || !reschedule.selectedTimeslotId || reschedule.submitting) {
+    return
+  }
+
+  reschedule.submitting = true
+  reschedule.error = ''
+  errorMessage.value = ''
+
+  try {
+    const message = await bookingsStore.rescheduleStudentBooking(
+      reschedule.bookingId,
+      reschedule.selectedTimeslotId,
+    )
+
+    successMessage.value = message
+    closeRescheduleModal()
+    await loadBookings(pagination.value.page)
+  } catch (error: unknown) {
+    reschedule.error = error instanceof Error ? error.message : 'Unable to reschedule booking.'
+  } finally {
+    reschedule.submitting = false
+  }
+}
+
+async function cancelBooking(booking: StudentBooking): Promise<void> {
+  if (isActionLoading(booking.id)) {
+    return
+  }
+
+  const confirmed = window.confirm(
+    'Cancel this booking? Refund depends on the 48-hour cancellation policy.',
+  )
+  if (!confirmed) {
+    return
+  }
+
+  setActionLoading(booking.id, true)
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await bookingsStore.cancelStudentBooking(booking.id)
+    successMessage.value = response.message
+    await loadBookings(pagination.value.page)
+  } catch (error: unknown) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to cancel booking.'
+  } finally {
+    setActionLoading(booking.id, false)
+  }
+}
+
 onMounted(() => {
   void loadBookings()
 })
@@ -247,6 +453,7 @@ onMounted(() => {
     </section>
 
     <p v-if="paymentMessage" class="feedback success">{{ paymentMessage }}</p>
+    <p v-if="successMessage" class="feedback success">{{ successMessage }}</p>
     <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
 
     <section class="tabs-row">
@@ -357,6 +564,32 @@ onMounted(() => {
               {{ statusLabel(booking) }}
             </span>
           </div>
+
+          <template v-if="canManageBooking(booking)">
+            <p class="policy-hint">{{ policyHint(booking) }}</p>
+            <div class="card-actions">
+              <button
+                type="button"
+                class="action-btn action-outline"
+                :disabled="isActionLoading(booking.id)"
+                @click="openRescheduleModal(booking)"
+              >
+                {{
+                  isActionLoading(booking.id) && reschedule.bookingId === booking.id
+                    ? 'Loading...'
+                    : 'Reschedule'
+                }}
+              </button>
+              <button
+                type="button"
+                class="action-btn action-dark"
+                :disabled="isActionLoading(booking.id)"
+                @click="cancelBooking(booking)"
+              >
+                {{ isActionLoading(booking.id) ? 'Working...' : 'Cancel' }}
+              </button>
+            </div>
+          </template>
         </article>
 
         <p v-if="bookings.length === 0" class="muted empty-message">
@@ -368,6 +601,83 @@ onMounted(() => {
         </p>
       </section>
     </template>
+
+    <div v-if="reschedule.open" class="modal-backdrop" @click.self="closeRescheduleModal">
+      <section class="reschedule-modal" role="dialog" aria-modal="true" aria-labelledby="rescheduleTitle">
+        <div class="modal-header">
+          <div>
+            <h2 id="rescheduleTitle" class="modal-title">Reschedule Booking</h2>
+            <p class="modal-subtitle">{{ reschedule.serviceTitle }}</p>
+          </div>
+          <button type="button" class="close-btn" @click="closeRescheduleModal">Close</button>
+        </div>
+
+        <p v-if="reschedule.loading" class="muted">Loading alternative timeslots...</p>
+        <p v-else-if="reschedule.error" class="feedback error inline">{{ reschedule.error }}</p>
+
+        <template v-else>
+          <div class="modal-grid">
+            <div>
+              <label class="label" for="reschedule-date">Choose a date</label>
+              <select
+                id="reschedule-date"
+                v-model="reschedule.selectedDate"
+                class="date-select"
+              >
+                <option
+                  v-for="dateOption in uniqueDateKeys(reschedule.timeslots)"
+                  :key="dateOption"
+                  :value="dateOption"
+                >
+                  {{ formatDate(`${dateOption}T00:00`) }}
+                </option>
+              </select>
+
+              <div class="timeslot-list">
+                <p class="label">Available times</p>
+                <button
+                  v-for="slot in rescheduleSlotsForDate()"
+                  :key="slot.id"
+                  type="button"
+                  class="timeslot-row selectable"
+                  :class="{ selected: reschedule.selectedTimeslotId === slot.id }"
+                  @click="selectRescheduleTimeslot(slot.id)"
+                >
+                  {{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <p class="label">Next 3 available</p>
+              <button
+                v-for="slot in nextThreeRescheduleSlots()"
+                :key="slot.id"
+                type="button"
+                class="next-row selectable"
+                :class="{ selected: reschedule.selectedTimeslotId === slot.id }"
+                @click="selectNextRescheduleSlot(slot)"
+              >
+                <div>{{ formatDate(slot.start_time) }}</div>
+                <div>{{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" @click="closeRescheduleModal">Cancel</button>
+            <button
+              type="button"
+              class="primary-btn"
+              :disabled="!reschedule.selectedTimeslotId || reschedule.submitting"
+              @click="submitReschedule"
+            >
+              {{ reschedule.submitting ? 'Updating...' : 'Update timeslot' }}
+            </button>
+          </div>
+        </template>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -503,6 +813,11 @@ h1 {
   background: #18475c;
 }
 
+.primary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .ghost-btn {
   background: #fff;
   border: 1px solid #d8dee3;
@@ -587,6 +902,51 @@ h1 {
   margin-bottom: 0.28rem;
 }
 
+.policy-hint {
+  color: #4d5f69;
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.action-btn {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.4rem 0.74rem;
+}
+
+.action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.action-outline {
+  background: #fff;
+  border: 1px solid #d8dee3;
+  color: #0f3341;
+}
+
+.action-outline:hover {
+  background: #f6f8f9;
+}
+
+.action-dark {
+  background: #0f3341;
+  color: #fff;
+}
+
+.action-dark:hover {
+  background: #18475c;
+}
+
 .status-badge {
   border: 1px solid transparent;
   border-radius: 999px;
@@ -614,10 +974,133 @@ h1 {
   color: #b91c1c;
 }
 
+.modal-backdrop {
+  align-items: center;
+  background: rgba(15, 51, 65, 0.4);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 80;
+}
+
+.reschedule-modal {
+  background: #fff;
+  border: 1px solid rgba(229, 176, 95, 0.42);
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(15, 51, 65, 0.2);
+  max-height: 90vh;
+  max-width: 760px;
+  overflow-y: auto;
+  padding: 1rem;
+  width: min(100%, 760px);
+}
+
+.modal-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.modal-title {
+  color: #0f3341;
+  font-size: 1.16rem;
+  font-weight: 800;
+}
+
+.modal-subtitle {
+  color: #884e1c;
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+
+.close-btn {
+  background: #fff;
+  border: 1px solid #d8dee3;
+  border-radius: 8px;
+  color: #0f3341;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.4rem 0.7rem;
+}
+
+.close-btn:hover {
+  background: #f6f8f9;
+}
+
+.modal-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.label {
+  color: #0f3341;
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.date-select {
+  background: #fff;
+  border: 1px solid #d8dee3;
+  border-radius: 9px;
+  margin-bottom: 0.7rem;
+  padding: 0.5rem 0.58rem;
+  width: 100%;
+}
+
+.timeslot-list {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.timeslot-row,
+.next-row {
+  background: #fff;
+  border: 1px solid #ecd9c6;
+  border-radius: 9px;
+  color: #4d5f69;
+  font-size: 0.9rem;
+  padding: 0.48rem 0.58rem;
+}
+
+.selectable {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.selectable:hover {
+  background: #fff8f0;
+}
+
+.selectable.selected {
+  border-color: #c57632;
+  box-shadow: 0 0 0 2px rgba(197, 118, 50, 0.18);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  margin-top: 0.9rem;
+}
+
 .feedback {
   border-radius: 10px;
   margin-bottom: 0.9rem;
   padding: 0.68rem 0.82rem;
+}
+
+.feedback.inline {
+  margin-bottom: 0.3rem;
 }
 
 .feedback.error {
@@ -666,6 +1149,10 @@ h1 {
     grid-column: 1 / -1;
     justify-content: flex-start;
   }
+
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -680,6 +1167,14 @@ h1 {
 
   .card-head {
     flex-direction: column;
+  }
+
+  .card-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions {
+    justify-content: flex-start;
   }
 }
 </style>

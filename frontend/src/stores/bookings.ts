@@ -38,6 +38,35 @@ export interface StudentBookingsQuery {
   date_to?: string
 }
 
+export interface RescheduleOption {
+  id: number
+  service_id: number
+  start_time: string
+  end_time: string
+}
+
+interface RescheduleOptionsResponse {
+  booking: {
+    id: number
+    service_id: number
+    timeslot_id: number
+    start_time: string
+  }
+  timeslots: RescheduleOption[]
+}
+
+interface CancelBookingResponse {
+  booking_id: number
+  refund_eligible: boolean
+  message: string
+}
+
+interface RescheduleBookingResponse {
+  booking_id: number
+  new_timeslot_id: number
+  message: string
+}
+
 interface StudentBookingsResponse {
   bookings: StudentBooking[]
   pagination?: PaginationMeta
@@ -93,8 +122,46 @@ export const useBookingsStore = defineStore('bookings', () => {
     }
   }
 
+  async function cancelStudentBooking(bookingId: number): Promise<CancelBookingResponse> {
+    try {
+      const response = await api.delete<CancelBookingResponse>(`/api/student/bookings/${bookingId}`)
+      return response.data
+    } catch (error: unknown) {
+      throw new Error(toErrorMessage(error, 'Unable to cancel booking.'))
+    }
+  }
+
+  async function fetchRescheduleOptions(bookingId: number): Promise<RescheduleOption[]> {
+    try {
+      const response = await api.get<RescheduleOptionsResponse>(
+        `/api/student/bookings/${bookingId}/reschedule-options`,
+      )
+      return response.data.timeslots ?? []
+    } catch (error: unknown) {
+      throw new Error(toErrorMessage(error, 'Unable to load reschedule options.'))
+    }
+  }
+
+  async function rescheduleStudentBooking(bookingId: number, newTimeslotId: number): Promise<string> {
+    try {
+      const response = await api.put<RescheduleBookingResponse>(
+        `/api/student/bookings/${bookingId}/reschedule`,
+        {
+          new_timeslot_id: newTimeslotId,
+        },
+      )
+
+      return response.data.message || 'Booking rescheduled successfully.'
+    } catch (error: unknown) {
+      throw new Error(toErrorMessage(error, 'Unable to reschedule booking.'))
+    }
+  }
+
   return {
+    cancelStudentBooking,
     fetchStudentBookings,
+    fetchRescheduleOptions,
+    rescheduleStudentBooking,
     studentBookings,
     studentLoading,
     studentPagination,

@@ -40,6 +40,9 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('GET', '/api/student/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'studentTimeslots']);
     $r->addRoute('GET', '/api/student/bookings', ['App\\Controllers\\Api\\BookingApiController', 'studentBookings']);
     $r->addRoute('GET', '/api/student/bookings/upcoming-count', ['App\\Controllers\\Api\\BookingApiController', 'upcomingCount']);
+    $r->addRoute('DELETE', '/api/student/bookings/{id:\\d+}', ['App\\Controllers\\Api\\BookingApiController', 'cancelBooking']);
+    $r->addRoute('GET', '/api/student/bookings/{id:\\d+}/reschedule-options', ['App\\Controllers\\Api\\BookingApiController', 'rescheduleOptions']);
+    $r->addRoute('PUT', '/api/student/bookings/{id:\\d+}/reschedule', ['App\\Controllers\\Api\\BookingApiController', 'rescheduleBooking']);
     $r->addRoute('POST', '/api/student/bookings/checkout-session', ['App\\Controllers\\Api\\BookingApiController', 'createCheckoutSession']);
     $r->addRoute('POST', '/api/stripe/webhook', ['App\\Controllers\\Api\\BookingApiController', 'stripeWebhook']);
 

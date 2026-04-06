@@ -32,6 +32,13 @@ interface IBookingService
     /** Student cancels own booking */
     public function cancelBookingForUser(int $bookingId, int $userId): bool;
 
+    /**
+     * Student cancels own booking and receives refund policy outcome.
+     *
+     * @return array{refund_eligible: bool, message: string}
+     */
+    public function cancelBookingWithPolicyForUser(int $bookingId, int $userId): array;
+
     /** Find booking by id for a specific user when he wants to change the timeslot */
     public function findByIdForUser(int $bookingId, int $userId): ?array;
 
@@ -46,6 +53,13 @@ interface IBookingService
 
     /** User changes timeslot for paid booking */
     public function changePaidBookingTimeslot(int $bookingId, int $userId, int $newTimeslotId): void;
+
+    /**
+     * Student gets reschedule options for a paid booking.
+     *
+     * @return array{booking: array<string, mixed>, timeslots: array<int, array<string, mixed>>}
+     */
+    public function getRescheduleOptionsForUser(int $bookingId, int $userId): array;
 
     /** Admin dashboard */
     public function countPaidBookings(): int;
