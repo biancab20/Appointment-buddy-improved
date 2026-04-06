@@ -68,6 +68,9 @@ class BookingApiController extends ApiBaseController
         } catch (\RuntimeException $e) {
             $this->json(['error' => $e->getMessage()], 400);
             return;
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Unable to start payment checkout.'], 500);
+            return;
         }
 
         $this->json($session, 201);

@@ -12,12 +12,25 @@ services:
         build:
             context: .
             dockerfile: PHP.Dockerfile
+        env_file:
+            - .env
         volumes:
             - ./app:/app
         working_dir: /app
         depends_on:
             - mysql
         command: sh -c "php src/Config/DatabaseSeeder.php && php-fpm"
+    stripe:
+        image: stripe/stripe-cli:latest
+        env_file:
+            - .env
+        depends_on:
+            - nginx
+        command: >
+            listen
+            --api-key ${STRIPE_SECRET_KEY}
+            --events checkout.session.completed,checkout.session.async_payment_failed,checkout.session.expired
+            --forward-to http://nginx/api/stripe/webhook
     mysql:
         image: mariadb:latest
         environment:

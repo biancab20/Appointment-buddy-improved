@@ -40,6 +40,12 @@ interface DeactivateTimeslotResponse {
   cancelled_bookings_count?: number
 }
 
+interface CreateCheckoutSessionResponse {
+  checkout_url: string
+  session_id: string
+  transaction_id: number
+}
+
 function toErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError<{ error?: string }>(error)) {
     return error.response?.data?.error ?? fallback
@@ -107,7 +113,34 @@ export const useTimeslotsStore = defineStore('timeslots', () => {
     }
   }
 
+  async function createStudentCheckoutSession(
+    timeslotId: number,
+    successUrl: string,
+    cancelUrl: string,
+  ): Promise<string> {
+    try {
+      const response = await api.post<CreateCheckoutSessionResponse>(
+        '/api/student/bookings/checkout-session',
+        {
+          timeslot_id: timeslotId,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        },
+      )
+
+      const checkoutUrl = response.data.checkout_url
+      if (!checkoutUrl) {
+        throw new Error('Checkout url was not returned by the server.')
+      }
+
+      return checkoutUrl
+    } catch (error: unknown) {
+      throw new Error(toErrorMessage(error, 'Unable to start payment checkout.'))
+    }
+  }
+
   return {
+    createStudentCheckoutSession,
     createTutorTimeslot,
     deactivateTutorTimeslot,
     fetchStudentServiceTimeslots,

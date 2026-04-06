@@ -1,5 +1,12 @@
 <?php
 
+// Keep API responses as valid JSON even when PHP emits notices/deprecations.
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('html_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
 require __DIR__ . '/../vendor/autoload.php';
 
 use FastRoute\RouteCollector;

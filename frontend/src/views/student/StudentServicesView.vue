@@ -15,6 +15,9 @@ interface ServiceTimeslotState {
   error: string
   timeslots: StudentTimeslot[]
   selectedDate: string
+  selectedTimeslotId: number | null
+  paymentLoading: boolean
+  paymentError: string
 }
 
 interface ServiceFilters {
@@ -87,6 +90,9 @@ function ensureState(serviceId: number): ServiceTimeslotState {
       error: '',
       timeslots: [],
       selectedDate: '',
+      selectedTimeslotId: null,
+      paymentLoading: false,
+      paymentError: '',
     }
   }
 
@@ -144,6 +150,20 @@ function slotsForDate(serviceId: number): StudentTimeslot[] {
 function nextThree(serviceId: number): StudentTimeslot[] {
   const state = ensureState(serviceId)
   return state.timeslots.slice(0, 3)
+}
+
+function findTimeslotById(serviceId: number, timeslotId: number | null): StudentTimeslot | null {
+  if (!timeslotId) {
+    return null
+  }
+
+  const state = ensureState(serviceId)
+  return state.timeslots.find((slot) => slot.id === timeslotId) ?? null
+}
+
+function selectedTimeslot(serviceId: number): StudentTimeslot | null {
+  const state = ensureState(serviceId)
+  return findTimeslotById(serviceId, state.selectedTimeslotId)
 }
 
 function toOptionalNumber(value: string): number | null {
@@ -257,11 +277,13 @@ async function loadServiceTimeslots(serviceId: number): Promise<void> {
   const state = ensureState(serviceId)
   state.loading = true
   state.error = ''
+  state.paymentError = ''
 
   try {
     const loadedTimeslots = await timeslotsStore.fetchStudentServiceTimeslots(serviceId)
     state.timeslots = loadedTimeslots
     state.loaded = true
+    state.selectedTimeslotId = null
 
     const firstTimeslot = loadedTimeslots[0]
     state.selectedDate = firstTimeslot ? dateKey(firstTimeslot.start_time) : ''
@@ -284,6 +306,44 @@ async function toggleTimeslots(serviceId: number): Promise<void> {
 
   if (!state.loaded && !state.loading) {
     await loadServiceTimeslots(serviceId)
+  }
+}
+
+function selectTimeslot(serviceId: number, timeslotId: number): void {
+  const state = ensureState(serviceId)
+  state.selectedTimeslotId = timeslotId
+  state.paymentError = ''
+}
+
+async function paySelectedTimeslot(serviceId: number): Promise<void> {
+  const state = ensureState(serviceId)
+  if (state.paymentLoading || !state.selectedTimeslotId) {
+    return
+  }
+
+  const selected = selectedTimeslot(serviceId)
+  if (!selected) {
+    state.paymentError = 'Please select a valid timeslot.'
+    return
+  }
+
+  state.paymentLoading = true
+  state.paymentError = ''
+
+  const origin = window.location.origin
+  const successUrl = `${origin}/student/bookings?payment=success&session_id={CHECKOUT_SESSION_ID}`
+  const cancelUrl = `${origin}/student/services?payment=cancelled`
+
+  try {
+    const checkoutUrl = await timeslotsStore.createStudentCheckoutSession(
+      selected.id,
+      successUrl,
+      cancelUrl,
+    )
+    window.location.assign(checkoutUrl)
+  } catch (error: unknown) {
+    state.paymentError = error instanceof Error ? error.message : 'Unable to start payment checkout.'
+    state.paymentLoading = false
   }
 }
 
@@ -511,24 +571,65 @@ onMounted(() => {
 
                     <div class="timeslot-list">
                       <p class="label">Available times</p>
-                      <div
+                      <button
                         v-for="slot in slotsForDate(service.id)"
                         :key="slot.id"
-                        class="timeslot-row"
+                        type="button"
+                        class="timeslot-row selectable"
+                        :class="{
+                          selected: ensureState(service.id).selectedTimeslotId === slot.id,
+                        }"
+                        @click="selectTimeslot(service.id, slot.id)"
                       >
                         {{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}
-                      </div>
+                      </button>
                     </div>
                   </div>
 
                   <div>
                     <p class="label">Next 3 available</p>
-                    <div v-for="slot in nextThree(service.id)" :key="slot.id" class="next-row">
+                    <button
+                      v-for="slot in nextThree(service.id)"
+                      :key="slot.id"
+                      type="button"
+                      class="next-row selectable"
+                      :class="{
+                        selected: ensureState(service.id).selectedTimeslotId === slot.id,
+                      }"
+                      @click="selectTimeslot(service.id, slot.id)"
+                    >
                       <div>{{ formatDate(slot.start_time) }}</div>
                       <div>{{ formatTime(slot.start_time) }} -> {{ formatTime(slot.end_time) }}</div>
-                    </div>
+                    </button>
                   </div>
                 </div>
+
+                <section class="pay-panel">
+                  <p v-if="selectedTimeslot(service.id)" class="selected-slot">
+                    Selected:
+                    <strong>
+                      {{ formatDate(selectedTimeslot(service.id)?.start_time ?? '') }}
+                      {{ formatTime(selectedTimeslot(service.id)?.start_time ?? '') }} ->
+                      {{ formatTime(selectedTimeslot(service.id)?.end_time ?? '') }}
+                    </strong>
+                  </p>
+                  <p v-else class="muted">Select a timeslot to continue to payment.</p>
+
+                  <p v-if="ensureState(service.id).paymentError" class="feedback error inline">
+                    {{ ensureState(service.id).paymentError }}
+                  </p>
+
+                  <button
+                    type="button"
+                    class="pay-btn"
+                    :disabled="
+                      !ensureState(service.id).selectedTimeslotId || ensureState(service.id).paymentLoading
+                    "
+                    @click="paySelectedTimeslot(service.id)"
+                  >
+                    {{ ensureState(service.id).paymentLoading ? 'Redirecting...' : 'Pay' }}
+                  </button>
+                </section>
               </template>
             </template>
           </div>
@@ -834,6 +935,59 @@ h1 {
   color: #4d5f69;
   font-size: 0.92rem;
   padding: 0.52rem 0.62rem;
+}
+
+.selectable {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.selectable:hover {
+  background: #fff8f0;
+}
+
+.selectable.selected {
+  border-color: #c57632;
+  box-shadow: 0 0 0 2px rgba(197, 118, 50, 0.18);
+}
+
+.pay-panel {
+  align-items: flex-start;
+  border-top: 1px solid #f0decb;
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+}
+
+.selected-slot {
+  color: #4d5f69;
+  font-size: 0.9rem;
+}
+
+.selected-slot strong {
+  color: #0f3341;
+}
+
+.pay-btn {
+  background: #0f3341;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.56rem 0.95rem;
+}
+
+.pay-btn:hover {
+  background: #174559;
+}
+
+.pay-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .feedback {
