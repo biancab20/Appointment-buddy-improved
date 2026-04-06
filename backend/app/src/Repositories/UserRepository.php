@@ -34,4 +34,14 @@ class UserRepository implements IUserRepository
 
         return $row ? UserModel::fromArray($row) : null;
     }
+
+    public function findById(int $id): ?UserModel
+    {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? UserModel::fromArray($row) : null;
+    }
 }

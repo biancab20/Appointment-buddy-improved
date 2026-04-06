@@ -80,4 +80,13 @@ class UserService implements IUserService
 
         return $user;
     }
+
+    public function findById(int $id): ?UserModel
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        return $this->userRepository->findById($id);
+    }
 }
