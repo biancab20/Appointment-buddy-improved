@@ -228,10 +228,9 @@ class ServiceApiController extends ApiBaseController
 
         $payload = $this->readJsonBody();
         $start = (string)($payload['start_time'] ?? '');
-        $end = (string)($payload['end_time'] ?? '');
 
         try {
-            $timeslotId = $this->timeslotService->createForService((int)$service->id, $start, $end);
+            $timeslotId = $this->timeslotService->createForService((int)$service->id, $start);
             $timeslot = $this->timeslotService->getTimeslot($timeslotId);
 
             $this->json([
@@ -254,10 +253,9 @@ class ServiceApiController extends ApiBaseController
 
         $payload = $this->readJsonBody();
         $start = (string)($payload['start_time'] ?? '');
-        $end = (string)($payload['end_time'] ?? '');
 
         try {
-            $this->timeslotService->updateTimeslot((int)$timeslot->id, $start, $end);
+            $this->timeslotService->updateTimeslot((int)$timeslot->id, $start);
             $updated = $this->timeslotService->getTimeslot((int)$timeslot->id);
 
             $this->json([

@@ -60,6 +60,7 @@ $queries = [
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
         timeslot_id INT NOT NULL,
+        price_at_booking DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         status ENUM('paid','cancelled') NOT NULL DEFAULT 'paid',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (student_id) REFERENCES users(id),
@@ -187,6 +188,34 @@ if ($nullTutorOwnerCount === 0) {
 }
 
 // Keep bookings.status in sync for existing databases.
+$priceAtBookingColumnExists = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'bookings'
+      AND COLUMN_NAME = 'price_at_booking'
+")->fetchColumn();
+
+if ($priceAtBookingColumnExists === 0) {
+    $pdo->exec("
+        ALTER TABLE bookings
+        ADD COLUMN price_at_booking DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER timeslot_id
+    ");
+}
+
+$pdo->exec("
+    UPDATE bookings b
+    JOIN timeslots t ON t.id = b.timeslot_id
+    JOIN services s ON s.id = t.service_id
+    SET b.price_at_booking = s.price
+    WHERE b.price_at_booking <= 0
+");
+
+$pdo->exec("
+    ALTER TABLE bookings
+    MODIFY COLUMN price_at_booking DECIMAL(10,2) NOT NULL DEFAULT 0.00
+");
+
 $pdo->exec("
     ALTER TABLE bookings
     MODIFY COLUMN status ENUM('pending','approved','cancelled','declined','paid') NOT NULL DEFAULT 'pending'

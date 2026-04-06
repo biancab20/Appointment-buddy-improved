@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\BookingModel;
 use App\Repositories\BookingRepository;
 use App\Repositories\Interfaces\IBookingRepository;
+use App\Repositories\Interfaces\IServiceRepository;
 use App\Repositories\Interfaces\ITimeslotRepository;
+use App\Repositories\ServiceRepository;
 use App\Repositories\TimeslotRepository;
 use App\Services\Interfaces\IBookingService;
 
@@ -13,15 +15,32 @@ class BookingService implements IBookingService
 {
     private IBookingRepository $bookingRepository;
     private ITimeslotRepository $timeslotRepository;
+    private IServiceRepository $serviceRepository;
 
     public function __construct()
     {
         $this->bookingRepository = new BookingRepository();
         $this->timeslotRepository = new TimeslotRepository();
+        $this->serviceRepository = new ServiceRepository();
     }
 
     public function requestBooking(int $studentId, int $timeslotId): int
     {
+        $timeslot = $this->timeslotRepository->find($timeslotId);
+        if (!$timeslot || !$timeslot->isActive) {
+            throw new \RuntimeException("This timeslot is unavailable.");
+        }
+
+        $start = new \DateTimeImmutable($timeslot->startTime);
+        if ($start <= new \DateTimeImmutable('now')) {
+            throw new \RuntimeException("Past timeslots cannot be booked.");
+        }
+
+        $service = $this->serviceRepository->find($timeslot->serviceId);
+        if (!$service || !$service->isActive) {
+            throw new \RuntimeException("This service is unavailable.");
+        }
+
         // Prevent same student booking same slot twice
         if ($this->bookingRepository->existsForUserAndTimeslot($studentId, $timeslotId)) {
             throw new \RuntimeException("You already booked this timeslot.");
@@ -36,6 +55,7 @@ class BookingService implements IBookingService
             id: null,
             studentId: $studentId,
             timeslotId: $timeslotId,
+            priceAtBooking: (float)$service->price,
             status: BookingModel::STATUS_PAID,
             createdAt: null
         );

@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 interface TutorService {
   id: number
   title: string
+  duration_minutes: number
   is_active: number | boolean
 }
 
@@ -31,13 +32,11 @@ const successMessage = ref('')
 const showCreateForm = ref(false)
 const createForm = reactive({
   start_time: '',
-  end_time: '',
 })
 
 const editingTimeslotId = ref<number | null>(null)
 const editForm = reactive({
   start_time: '',
-  end_time: '',
 })
 
 function isActive(value: number | boolean): boolean {
@@ -82,13 +81,11 @@ function formatHumanDateTime(value: string): string {
 
 function resetCreateForm(): void {
   createForm.start_time = ''
-  createForm.end_time = ''
 }
 
 function startEdit(timeslot: Timeslot): void {
   editingTimeslotId.value = timeslot.id
   editForm.start_time = toInputDateTime(timeslot.start_time)
-  editForm.end_time = toInputDateTime(timeslot.end_time)
 }
 
 function cancelEdit(): void {
@@ -130,7 +127,6 @@ async function createTimeslot(): Promise<void> {
   try {
     await api.post(`/api/tutor/services/${serviceId.value}/timeslots`, {
       start_time: createForm.start_time,
-      end_time: createForm.end_time,
     })
 
     successMessage.value = 'Timeslot created.'
@@ -153,7 +149,6 @@ async function updateTimeslot(timeslotId: number): Promise<void> {
   try {
     await api.put(`/api/tutor/timeslots/${timeslotId}`, {
       start_time: editForm.start_time,
-      end_time: editForm.end_time,
     })
 
     successMessage.value = 'Timeslot updated.'
@@ -203,6 +198,36 @@ async function deactivateTimeslot(timeslotId: number): Promise<void> {
 onMounted(() => {
   void loadTimeslots()
 })
+
+function formatPreviewDateTime(value: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(value)
+}
+
+function calculatedEndPreview(startValue: string): string {
+  if (!service.value || !startValue) {
+    return 'Select a start time'
+  }
+
+  const startDate = new Date(startValue)
+  if (Number.isNaN(startDate.getTime())) {
+    return 'Invalid start time'
+  }
+
+  const durationMinutes = Number(service.value.duration_minutes ?? 0)
+  if (durationMinutes <= 0) {
+    return 'Invalid service duration'
+  }
+
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
+  return formatPreviewDateTime(endDate)
+}
 </script>
 
 <template>
@@ -236,15 +261,12 @@ onMounted(() => {
       </button>
 
       <form v-if="showCreateForm" class="panel create-panel" @submit.prevent="createTimeslot">
-        <label class="field">
+        <label class="field wide">
           <span>Start</span>
           <input v-model="createForm.start_time" type="datetime-local" required />
         </label>
 
-        <label class="field">
-          <span>End</span>
-          <input v-model="createForm.end_time" type="datetime-local" required />
-        </label>
+        <p class="auto-end">End time (auto): {{ calculatedEndPreview(createForm.start_time) }}</p>
 
         <div class="form-actions">
           <button type="button" class="ghost-btn" @click="showCreateForm = false">Cancel</button>
@@ -261,7 +283,9 @@ onMounted(() => {
           <div class="timeslot-header">
             <div>
               <div class="title-row">
-                <h2>{{ formatHumanDateTime(timeslot.start_time) }} → {{ formatHumanDateTime(timeslot.end_time) }}</h2>
+                <h2>
+                  {{ formatHumanDateTime(timeslot.start_time) }} -> {{ formatHumanDateTime(timeslot.end_time) }}
+                </h2>
                 <span v-if="isActive(timeslot.is_active)" class="badge active">Active</span>
                 <span v-else class="badge inactive">Inactive</span>
                 <span v-if="isPast(timeslot.start_time)" class="badge neutral">Past</span>
@@ -291,15 +315,12 @@ onMounted(() => {
         </template>
 
         <form v-else class="edit-grid" @submit.prevent="updateTimeslot(timeslot.id)">
-          <label class="field">
+          <label class="field wide">
             <span>Start</span>
             <input v-model="editForm.start_time" type="datetime-local" required />
           </label>
 
-          <label class="field">
-            <span>End</span>
-            <input v-model="editForm.end_time" type="datetime-local" required />
-          </label>
+          <p class="auto-end">End time (auto): {{ calculatedEndPreview(editForm.start_time) }}</p>
 
           <div class="form-actions">
             <button type="button" class="ghost-btn" @click="cancelEdit">Cancel</button>
@@ -459,6 +480,16 @@ h2 {
   color: #223844;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.field.wide {
+  grid-column: 1 / -1;
+}
+
+.auto-end {
+  color: #4f606c;
+  font-size: 0.9rem;
+  grid-column: 1 / -1;
 }
 
 input {

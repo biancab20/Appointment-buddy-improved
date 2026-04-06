@@ -135,11 +135,16 @@ class ServiceRepository implements IServiceRepository
         ");
         $stmt->execute([':id' => $serviceId]);
 
-        // 2) deactivate all timeslots for that service
+        // 2) deactivate only timeslots that do not have paid bookings.
+        // Booked timeslots stay active so the tutor can still deliver those sessions.
         $stmt2 = $pdo->prepare("
-            UPDATE timeslots
-            SET is_active = 0
-            WHERE service_id = :id
+            UPDATE timeslots t
+            LEFT JOIN bookings b
+              ON b.timeslot_id = t.id
+             AND b.status = 'paid'
+            SET t.is_active = 0
+            WHERE t.service_id = :id
+              AND b.id IS NULL
         ");
         $stmt2->execute([':id' => $serviceId]);
 

@@ -37,16 +37,27 @@ class TimeslotService implements ITimeslotService
         return $this->timeslotRepository->find($timeslotId);
     }
 
-    public function createForService(int $serviceId, string $start, string $end): int
+    public function createForService(int $serviceId, string $start): int
     {
+        $service = $this->serviceRepository->find($serviceId);
+        if (!$service) {
+            throw new \RuntimeException("Service not found.");
+        }
+
+        if ($service->durationMinutes <= 0) {
+            throw new \RuntimeException("Service duration must be greater than 0.");
+        }
+
         $startDt = $this->parseDateTimeLocal($start);
-        $endDt = $this->parseDateTimeLocal($end);
         $now = new \DateTimeImmutable('now');
 
         if ($startDt <= $now)
             throw new \RuntimeException("Start time must be in the future.");
-        if ($endDt <= $startDt)
-            throw new \RuntimeException("End time must be after start time.");
+
+        $endDt = $startDt->modify('+' . (int)$service->durationMinutes . ' minutes');
+        if ($endDt === false || $endDt <= $startDt) {
+            throw new \RuntimeException("Could not calculate end time from service duration.");
+        }
 
         $model = new TimeslotModel(
             id: null,
@@ -59,7 +70,7 @@ class TimeslotService implements ITimeslotService
         return $this->timeslotRepository->create($model);
     }
 
-    public function updateTimeslot(int $timeslotId, string $start, string $end): void
+    public function updateTimeslot(int $timeslotId, string $start): void
     {
         // block update if a paid booking exists
         if ($this->bookingRepository->countActiveForTimeslot($timeslotId) > 0) {
@@ -70,14 +81,25 @@ class TimeslotService implements ITimeslotService
         if (!$existing)
             throw new \RuntimeException("Timeslot not found.");
 
+        $service = $this->serviceRepository->find($existing->serviceId);
+        if (!$service) {
+            throw new \RuntimeException("Service not found.");
+        }
+
+        if ($service->durationMinutes <= 0) {
+            throw new \RuntimeException("Service duration must be greater than 0.");
+        }
+
         $startDt = $this->parseDateTimeLocal($start);
-        $endDt = $this->parseDateTimeLocal($end);
         $now = new \DateTimeImmutable('now');
 
         if ($startDt <= $now)
             throw new \RuntimeException("Start time must be in the future.");
-        if ($endDt <= $startDt)
-            throw new \RuntimeException("End time must be after start time.");
+
+        $endDt = $startDt->modify('+' . (int)$service->durationMinutes . ' minutes');
+        if ($endDt === false || $endDt <= $startDt) {
+            throw new \RuntimeException("Could not calculate end time from service duration.");
+        }
 
         $existing->startTime = $startDt->format('Y-m-d H:i:s');
         $existing->endTime = $endDt->format('Y-m-d H:i:s');

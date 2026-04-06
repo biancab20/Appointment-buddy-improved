@@ -18,8 +18,8 @@ interface ITimeslotService
     /** @return TimeslotModel[] */
     public function getAllForService(int $serviceId): array;
 
-    public function createForService(int $serviceId, string $start, string $end): int;
+    public function createForService(int $serviceId, string $start): int;
 
-    public function updateTimeslot(int $timeslotId, string $start, string $end): void;
+    public function updateTimeslot(int $timeslotId, string $start): void;
     public function activateTimeslot(int $timeslotId): void;
 }

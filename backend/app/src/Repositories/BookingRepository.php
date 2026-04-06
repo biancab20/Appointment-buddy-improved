@@ -18,6 +18,7 @@ class BookingRepository implements IBookingRepository
                 b.id,
                 b.status,
                 b.created_at,
+                b.price_at_booking,
                 u.name AS student_name,
                 u.email AS student_email,
                 s.title AS service_title,
@@ -36,13 +37,14 @@ class BookingRepository implements IBookingRepository
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("
-            INSERT INTO bookings (student_id, timeslot_id, status)
-            VALUES (:student_id, :timeslot_id, :status)
+            INSERT INTO bookings (student_id, timeslot_id, price_at_booking, status)
+            VALUES (:student_id, :timeslot_id, :price_at_booking, :status)
         ");
 
         $stmt->execute([
             ':student_id' => $booking->studentId,
             ':timeslot_id' => $booking->timeslotId,
+            ':price_at_booking' => $booking->priceAtBooking,
             ':status' => $booking->status,
         ]);
 
@@ -77,6 +79,7 @@ class BookingRepository implements IBookingRepository
                 b.id,
                 b.status,
                 b.created_at,
+                b.price_at_booking,
                 t.start_time,
                 t.end_time,
                 s.id AS service_id,

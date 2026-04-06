@@ -134,7 +134,7 @@ async function deactivateService(serviceId: number): Promise<void> {
   successMessage.value = ''
 
   const shouldContinue = window.confirm(
-    'Disable this service? It will be hidden and all its timeslots will be deactivated.',
+    'Disable this service? It will be hidden. Only unbooked timeslots will be deactivated; paid bookings remain scheduled.',
   )
   if (!shouldContinue) {
     return
@@ -226,7 +226,7 @@ onMounted(() => {
               <p v-if="service.description" class="desc">{{ service.description }}</p>
               <p class="meta">
                 Duration: <strong>{{ service.duration_minutes }}</strong> min |
-                Price: <strong>€{{ Number(service.price).toFixed(2) }}</strong>
+                Price: <strong>EUR {{ Number(service.price).toFixed(2) }}</strong>
               </p>
             </div>
 
