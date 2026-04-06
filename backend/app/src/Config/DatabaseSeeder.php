@@ -66,6 +66,35 @@ $queries = [
         FOREIGN KEY (student_id) REFERENCES users(id),
         FOREIGN KEY (timeslot_id) REFERENCES timeslots(id)
     )",
+
+    "CREATE TABLE IF NOT EXISTS transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        tutor_id INT NOT NULL,
+        service_id INT NOT NULL,
+        timeslot_id INT NOT NULL,
+        booking_id INT NULL,
+        provider ENUM('stripe') NOT NULL DEFAULT 'stripe',
+        provider_session_id VARCHAR(255) NOT NULL UNIQUE,
+        provider_payment_intent_id VARCHAR(255) NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'eur',
+        status ENUM('pending','paid','failed','cancelled') NOT NULL DEFAULT 'pending',
+        failure_reason VARCHAR(255) NULL,
+        paid_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_transactions_student_id (student_id),
+        INDEX idx_transactions_tutor_id (tutor_id),
+        INDEX idx_transactions_service_id (service_id),
+        INDEX idx_transactions_timeslot_id (timeslot_id),
+        INDEX idx_transactions_status (status),
+        CONSTRAINT fk_transactions_student_id FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE RESTRICT,
+        CONSTRAINT fk_transactions_tutor_id FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE RESTRICT,
+        CONSTRAINT fk_transactions_service_id FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT,
+        CONSTRAINT fk_transactions_timeslot_id FOREIGN KEY (timeslot_id) REFERENCES timeslots(id) ON DELETE RESTRICT,
+        CONSTRAINT fk_transactions_booking_id FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+    )",
 ];
 
 foreach ($queries as $sql) {
