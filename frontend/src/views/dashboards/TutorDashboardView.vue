@@ -89,19 +89,16 @@ onMounted(() => {
         <RouterLink to="/tutor/services" class="action-card action-primary action-link">
           <h2>Manage Services</h2>
           <p>Create, update, and deactivate your tutoring services.</p>
-          <span class="action-note">Tutor service CRUD enabled via API</span>
         </RouterLink>
 
         <RouterLink to="/tutor/services" class="action-card action-dark action-link">
           <h2>Manage Timeslots</h2>
           <p>Add, edit, and cancel timeslots for the services you own.</p>
-          <span class="action-note">Tutor timeslot CRUD enabled via API</span>
         </RouterLink>
 
         <article class="action-card action-light">
           <h2>Bookings Overview</h2>
           <p>Review booked sessions and cancellations from your timetable.</p>
-          <span class="action-note">UI workflow can be added next</span>
         </article>
       </div>
     </section>
