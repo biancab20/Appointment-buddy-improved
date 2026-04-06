@@ -38,6 +38,7 @@ $queries = [
         title VARCHAR(255) NOT NULL,
         description TEXT,
         duration_minutes INT NOT NULL,
+        price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
@@ -73,6 +74,27 @@ $pdo->exec("
     MODIFY COLUMN role ENUM('admin','tutor','student') NOT NULL DEFAULT 'student'
 ");
 
+// Keep services.price in sync for existing databases.
+$priceColumnExists = (int) $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'services'
+      AND COLUMN_NAME = 'price'
+")->fetchColumn();
+
+if ($priceColumnExists === 0) {
+    $pdo->exec("
+        ALTER TABLE services
+        ADD COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER duration_minutes
+    ");
+}
+
+$pdo->exec("
+    ALTER TABLE services
+    MODIFY COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00
+");
+
 echo "Tables ensured.\n";
 
 $userCount = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
@@ -104,14 +126,15 @@ $insertUser->execute([
 ]);
 
 $insertService = $pdo->prepare("
-    INSERT INTO services (title, description, duration_minutes, is_active)
-    VALUES (:title, :description, :duration_minutes, :is_active)
+    INSERT INTO services (title, description, duration_minutes, price, is_active)
+    VALUES (:title, :description, :duration_minutes, :price, :is_active)
 ");
 
 $insertService->execute([
     ':title' => 'Mathematics Tutoring',
     ':description' => 'Personalized math sessions tailored to your needs.',
     ':duration_minutes' => 60,
+    ':price' => 32.50,
     ':is_active' => 1,
 ]);
 $mathId = (int) $pdo->lastInsertId();
@@ -120,6 +143,7 @@ $insertService->execute([
     ':title' => 'English Tutoring',
     ':description' => 'Grammar, writing, and comprehension help.',
     ':duration_minutes' => 60,
+    ':price' => 29.99,
     ':is_active' => 1,
 ]);
 $englishId = (int) $pdo->lastInsertId();
@@ -128,6 +152,7 @@ $insertService->execute([
     ':title' => 'Science Tutoring',
     ':description' => 'Support for physics, chemistry, and biology.',
     ':duration_minutes' => 60,
+    ':price' => 35.00,
     ':is_active' => 1,
 ]);
 $scienceId = (int) $pdo->lastInsertId();

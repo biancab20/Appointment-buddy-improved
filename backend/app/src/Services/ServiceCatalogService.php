@@ -31,7 +31,7 @@ class ServiceCatalogService implements IServiceCatalogService
         return $this->serviceRepository->find($id);
     }
 
-    public function createService(string $title, ?string $description, int $durationMinutes): int
+    public function createService(string $title, ?string $description, int $durationMinutes, float $price): int
     {
         $title = trim($title);
         if ($title === '') {
@@ -42,11 +42,16 @@ class ServiceCatalogService implements IServiceCatalogService
             throw new \RuntimeException("Duration must be greater than 0.");
         }
 
+        if ($price <= 0) {
+            throw new \RuntimeException("Price must be greater than 0.");
+        }
+
         $service = new ServiceModel(
             id: null,
             title: $title,
             description: $description ? trim($description) : null,
             durationMinutes: $durationMinutes,
+            price: $price,
             isActive: true,
             createdAt: null
         );
@@ -54,16 +59,21 @@ class ServiceCatalogService implements IServiceCatalogService
         return $this->serviceRepository->create($service);
     }
 
-    public function updateService(int $id, string $title, ?string $description, int $durationMinutes): void
+    public function updateService(int $id, string $title, ?string $description, int $durationMinutes, float $price): void
     {
         $service = $this->serviceRepository->find($id);
         if (!$service) {
             throw new \RuntimeException("Service not found.");
         }
 
+        if ($price <= 0) {
+            throw new \RuntimeException("Price must be greater than 0.");
+        }
+
         $service->title = trim($title);
         $service->description = $description ? trim($description) : null;
         $service->durationMinutes = $durationMinutes;
+        $service->price = $price;
 
         $this->serviceRepository->update($service);
     }

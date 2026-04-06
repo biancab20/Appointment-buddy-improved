@@ -9,6 +9,7 @@ final class ServiceModel
         public string $title,
         public ?string $description,
         public int $durationMinutes,
+        public float $price,
         public bool $isActive = true,
         public ?string $createdAt = null
     ) {}
@@ -20,6 +21,7 @@ final class ServiceModel
             title: (string)($row['title'] ?? ''),
             description: $row['description'] ?? null,
             durationMinutes: (int)($row['duration_minutes'] ?? 0),
+            price: (float)($row['price'] ?? 0),
             isActive: isset($row['is_active']) ? (bool) $row['is_active'] : true,
             createdAt: $row['created_at'] ?? null
         );
@@ -32,6 +34,7 @@ final class ServiceModel
             'title' => $this->title,
             'description' => $this->description,
             'duration_minutes' => $this->durationMinutes,
+            'price' => $this->price,
             'is_active' => $this->isActive,
             'created_at' => $this->createdAt,
         ];

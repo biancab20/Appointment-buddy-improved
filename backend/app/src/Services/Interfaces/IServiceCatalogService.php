@@ -14,9 +14,9 @@ interface IServiceCatalogService
 
     public function getService(int $id): ?ServiceModel;
 
-    public function createService(string $title, ?string $description, int $durationMinutes): int;
+    public function createService(string $title, ?string $description, int $durationMinutes, float $price): int;
 
-    public function updateService(int $id, string $title, ?string $description, int $durationMinutes): void;
+    public function updateService(int $id, string $title, ?string $description, int $durationMinutes, float $price): void;
 
     public function deactivateService(int $id): void;
 

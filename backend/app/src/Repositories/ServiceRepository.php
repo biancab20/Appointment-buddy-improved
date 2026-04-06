@@ -15,14 +15,15 @@ class ServiceRepository implements IServiceRepository
         $pdo = Database::getConnection();
 
         $stmt = $pdo->prepare("
-            INSERT INTO services (title, description, duration_minutes, is_active)
-            VALUES (:title, :description, :duration_minutes, :is_active)
+            INSERT INTO services (title, description, duration_minutes, price, is_active)
+            VALUES (:title, :description, :duration_minutes, :price, :is_active)
         ");
 
         $stmt->execute([
             ':title' => $service->title,
             ':description' => $service->description,
             ':duration_minutes' => $service->durationMinutes,
+            ':price' => $service->price,
             ':is_active' => $service->isActive ? 1 : 0,
         ]);
 
@@ -77,7 +78,8 @@ class ServiceRepository implements IServiceRepository
             UPDATE services
             SET title = :title,
                 description = :description,
-                duration_minutes = :duration_minutes
+                duration_minutes = :duration_minutes,
+                price = :price
             WHERE id = :id
         ");
 
@@ -85,6 +87,7 @@ class ServiceRepository implements IServiceRepository
             ':title' => $service->title,
             ':description' => $service->description,
             ':duration_minutes' => $service->durationMinutes,
+            ':price' => $service->price,
             ':id' => $service->id,
         ]);
 
