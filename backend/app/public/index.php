@@ -60,6 +60,12 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('GET', '/api/tutor/bookings/calendar', ['App\\Controllers\\Api\\BookingApiController', 'tutorBookingsCalendar']);
     $r->addRoute('DELETE', '/api/tutor/bookings/{id:\\d+}', ['App\\Controllers\\Api\\BookingApiController', 'tutorCancelBooking']);
 
+    // Admin read endpoints
+    $r->addRoute('GET', '/api/admin/users', ['App\\Controllers\\Api\\AdminApiController', 'users']);
+    $r->addRoute('GET', '/api/admin/services', ['App\\Controllers\\Api\\AdminApiController', 'services']);
+    $r->addRoute('GET', '/api/admin/bookings', ['App\\Controllers\\Api\\AdminApiController', 'bookings']);
+    $r->addRoute('GET', '/api/admin/transactions', ['App\\Controllers\\Api\\AdminApiController', 'transactions']);
+
     $r->addRoute('GET', '/api/admin/bookings/paid', ['App\\Controllers\\Api\\BookingApiController', 'paid']);
 });
 
@@ -88,3 +94,4 @@ switch ($routeInfo[0]) {
         $controller->$method($vars);
         break;
 }
+

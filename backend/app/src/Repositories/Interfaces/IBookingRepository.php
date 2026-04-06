@@ -50,6 +50,22 @@ interface IBookingRepository
     /** Get all bookings for admin */
     public function getAll(): array;
 
+    /**
+     * Get all bookings for admin with pagination and filters.
+     *
+     * @param array{
+     *   status?: string,
+     *   scope?: string,
+     *   student_id?: int|null,
+     *   tutor_id?: int|null,
+     *   service_id?: int|null,
+     *   date_from?: string|null,
+     *   date_to?: string|null
+     * } $filters
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getAllPaginated(array $filters, int $page, int $perPage): array;
+
     /** Admin action: update booking status */
     public function updateStatus(int $bookingId, string $status): bool;
 

@@ -76,6 +76,81 @@ class TransactionRepository implements ITransactionRepository
         return $row ?: null;
     }
 
+    
+    public function getPaginated(array $filters, int $page, int $perPage): array
+    {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        $whereParts = ['1 = 1'];
+        $params = [];
+
+        $status = strtolower(trim((string)($filters['status'] ?? '')));
+        if ($status !== '') {
+            $whereParts[] = 'tr.status = :status';
+            $params[':status'] = $status;
+        }
+
+        $provider = strtolower(trim((string)($filters['provider'] ?? '')));
+        if ($provider !== '') {
+            $whereParts[] = 'tr.provider = :provider';
+            $params[':provider'] = $provider;
+        }
+
+        $currency = strtolower(trim((string)($filters['currency'] ?? '')));
+        if ($currency !== '') {
+            $whereParts[] = 'tr.currency = :currency';
+            $params[':currency'] = $currency;
+        }
+
+        foreach (['student_id', 'tutor_id', 'service_id', 'timeslot_id', 'booking_id'] as $intFilter) {
+            if (array_key_exists($intFilter, $filters) && $filters[$intFilter] !== null) {
+                $whereParts[] = "tr.{$intFilter} = :{$intFilter}";
+                $params[':' . $intFilter] = (int)$filters[$intFilter];
+            }
+        }
+
+        if (array_key_exists('date_from', $filters) && $filters['date_from'] !== null) {
+            $whereParts[] = 'DATE(tr.created_at) >= :date_from';
+            $params[':date_from'] = (string)$filters['date_from'];
+        }
+
+        if (array_key_exists('date_to', $filters) && $filters['date_to'] !== null) {
+            $whereParts[] = 'DATE(tr.created_at) <= :date_to';
+            $params[':date_to'] = (string)$filters['date_to'];
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $countStmt = $pdo->prepare("\n            SELECT COUNT(*)\n            FROM transactions tr\n            WHERE {$whereSql}\n        ");
+        foreach ($params as $key => $value) {
+            if (is_int($value)) {
+                $countStmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $countStmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $countStmt->execute();
+        $total = (int)$countStmt->fetchColumn();
+
+        $stmt = $pdo->prepare("\n            SELECT\n                tr.*,\n                student.name AS student_name,\n                student.email AS student_email,\n                tutor.name AS tutor_name,\n                tutor.email AS tutor_email,\n                s.title AS service_title,\n                t.start_time,\n                t.end_time\n            FROM transactions tr\n            JOIN users student ON tr.student_id = student.id\n            JOIN users tutor ON tr.tutor_id = tutor.id\n            JOIN services s ON tr.service_id = s.id\n            JOIN timeslots t ON tr.timeslot_id = t.id\n            WHERE {$whereSql}\n            ORDER BY tr.created_at DESC, tr.id DESC\n            LIMIT :limit OFFSET :offset\n        ");
+        foreach ($params as $key => $value) {
+            if (is_int($value)) {
+                $stmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'total' => $total,
+        ];
+    }
+
     public function markPaid(int $transactionId, int $bookingId, ?string $providerPaymentIntentId): bool
     {
         $pdo = Database::getConnection();
@@ -159,3 +234,4 @@ class TransactionRepository implements ITransactionRepository
         return $stmt->rowCount() > 0;
     }
 }
+

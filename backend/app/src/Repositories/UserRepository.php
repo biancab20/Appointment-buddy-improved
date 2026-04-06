@@ -24,6 +24,51 @@ class UserRepository implements IUserRepository
 
         return (int)$pdo->lastInsertId();
     }
+    public function getPaginated(array $filters, int $page, int $perPage): array
+    {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        $whereParts = ['1 = 1'];
+        $params = [];
+
+        $role = strtolower(trim((string)($filters['role'] ?? '')));
+        if ($role !== '') {
+            $whereParts[] = 'u.role = :role';
+            $params[':role'] = $role;
+        }
+
+        $search = trim((string)($filters['search'] ?? ''));
+        if ($search !== '') {
+            $whereParts[] = '(u.name LIKE :search OR u.email LIKE :search)';
+            $params[':search'] = '%' . $search . '%';
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM users u WHERE {$whereSql}");
+        foreach ($params as $key => $value) {
+            $countStmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+        }
+        $countStmt->execute();
+        $total = (int)$countStmt->fetchColumn();
+
+        $stmt = $pdo->prepare("\n            SELECT u.*\n            FROM users u\n            WHERE {$whereSql}\n            ORDER BY u.created_at DESC, u.id DESC\n            LIMIT :limit OFFSET :offset\n        ");
+
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'items' => array_map(fn(array $row) => UserModel::fromArray($row), $rows),
+            'total' => $total,
+        ];
+    }
 
     public function findByEmail(string $email): ?UserModel
     {
@@ -45,3 +90,4 @@ class UserRepository implements IUserRepository
         return $row ? UserModel::fromArray($row) : null;
     }
 }
+

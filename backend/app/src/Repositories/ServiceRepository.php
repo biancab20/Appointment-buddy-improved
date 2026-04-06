@@ -27,7 +27,7 @@ class ServiceRepository implements IServiceRepository
             ':is_active' => $service->isActive ? 1 : 0,
         ]);
 
-        return (int) $pdo->lastInsertId();
+        return (int)$pdo->lastInsertId();
     }
 
     // Admin //
@@ -45,6 +45,61 @@ class ServiceRepository implements IServiceRepository
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(fn(array $row) => ServiceModel::fromArray($row), $rows);
+    }
+
+    public function getAllPaginated(array $filters, int $page, int $perPage): array
+    {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        [$whereSql, $params] = $this->buildAdminFilters($filters);
+
+        $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            {$whereSql}
+        ");
+        foreach ($params as $name => $value) {
+            if (is_int($value)) {
+                $countStmt->bindValue($name, $value, PDO::PARAM_INT);
+            } elseif (is_bool($value)) {
+                $countStmt->bindValue($name, $value ? 1 : 0, PDO::PARAM_INT);
+            } else {
+                $countStmt->bindValue($name, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $countStmt->execute();
+        $total = (int)$countStmt->fetchColumn();
+
+        $stmt = $pdo->prepare("
+            SELECT s.*, u.name AS tutor_name
+            FROM services s
+            JOIN users u ON u.id = s.tutor_id
+            {$whereSql}
+            ORDER BY s.created_at DESC, s.id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+
+        foreach ($params as $name => $value) {
+            if (is_int($value)) {
+                $stmt->bindValue($name, $value, PDO::PARAM_INT);
+            } elseif (is_bool($value)) {
+                $stmt->bindValue($name, $value ? 1 : 0, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($name, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'items' => array_map(fn(array $row) => ServiceModel::fromArray($row), $rows),
+            'total' => $total,
+        ];
     }
 
     // Student //
@@ -86,7 +141,7 @@ class ServiceRepository implements IServiceRepository
             }
         }
         $countStmt->execute();
-        $total = (int) $countStmt->fetchColumn();
+        $total = (int)$countStmt->fetchColumn();
 
         $stmt = $pdo->prepare("
             SELECT s.*, u.name AS tutor_name
@@ -224,7 +279,54 @@ class ServiceRepository implements IServiceRepository
         $stmt->execute([':id' => $serviceId]);
 
         $val = $stmt->fetchColumn();
-        return (int) $val === 1;
+        return (int)$val === 1;
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, int|string|bool>}
+     */
+    private function buildAdminFilters(array $filters): array
+    {
+        $conditions = ['1 = 1'];
+        $params = [];
+
+        $subject = trim((string)($filters['subject'] ?? ''));
+        if ($subject !== '') {
+            $conditions[] = 's.title LIKE :subject';
+            $params[':subject'] = '%' . $subject . '%';
+        }
+
+        if (array_key_exists('tutor_id', $filters) && $filters['tutor_id'] !== null) {
+            $conditions[] = 's.tutor_id = :tutor_id';
+            $params[':tutor_id'] = (int)$filters['tutor_id'];
+        }
+
+        if (array_key_exists('is_active', $filters) && $filters['is_active'] !== null) {
+            $conditions[] = 's.is_active = :is_active';
+            $params[':is_active'] = (bool)$filters['is_active'];
+        }
+
+        if (array_key_exists('min_duration', $filters) && $filters['min_duration'] !== null) {
+            $conditions[] = 's.duration_minutes >= :min_duration';
+            $params[':min_duration'] = (int)$filters['min_duration'];
+        }
+
+        if (array_key_exists('max_duration', $filters) && $filters['max_duration'] !== null) {
+            $conditions[] = 's.duration_minutes <= :max_duration';
+            $params[':max_duration'] = (int)$filters['max_duration'];
+        }
+
+        if (array_key_exists('min_price', $filters) && $filters['min_price'] !== null) {
+            $conditions[] = 's.price >= :min_price';
+            $params[':min_price'] = number_format((float)$filters['min_price'], 2, '.', '');
+        }
+
+        if (array_key_exists('max_price', $filters) && $filters['max_price'] !== null) {
+            $conditions[] = 's.price <= :max_price';
+            $params[':max_price'] = number_format((float)$filters['max_price'], 2, '.', '');
+        }
+
+        return ['WHERE ' . implode(' AND ', $conditions), $params];
     }
 
     /**
@@ -243,22 +345,22 @@ class ServiceRepository implements IServiceRepository
 
         if (array_key_exists('min_duration', $filters) && $filters['min_duration'] !== null) {
             $conditions[] = 's.duration_minutes >= :min_duration';
-            $params[':min_duration'] = (int) $filters['min_duration'];
+            $params[':min_duration'] = (int)$filters['min_duration'];
         }
 
         if (array_key_exists('max_duration', $filters) && $filters['max_duration'] !== null) {
             $conditions[] = 's.duration_minutes <= :max_duration';
-            $params[':max_duration'] = (int) $filters['max_duration'];
+            $params[':max_duration'] = (int)$filters['max_duration'];
         }
 
         if (array_key_exists('min_price', $filters) && $filters['min_price'] !== null) {
             $conditions[] = 's.price >= :min_price';
-            $params[':min_price'] = number_format((float) $filters['min_price'], 2, '.', '');
+            $params[':min_price'] = number_format((float)$filters['min_price'], 2, '.', '');
         }
 
         if (array_key_exists('max_price', $filters) && $filters['max_price'] !== null) {
             $conditions[] = 's.price <= :max_price';
-            $params[':max_price'] = number_format((float) $filters['max_price'], 2, '.', '');
+            $params[':max_price'] = number_format((float)$filters['max_price'], 2, '.', '');
         }
 
         return ['WHERE ' . implode(' AND ', $conditions), $params];

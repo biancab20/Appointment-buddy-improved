@@ -17,6 +17,23 @@ interface ITransactionRepository
 
     public function findBySessionId(string $providerSessionId): ?array;
 
+    /**
+     * @param array{
+     *   status?: string,
+     *   provider?: string,
+     *   currency?: string,
+     *   student_id?: int|null,
+     *   tutor_id?: int|null,
+     *   service_id?: int|null,
+     *   timeslot_id?: int|null,
+     *   booking_id?: int|null,
+     *   date_from?: string|null,
+     *   date_to?: string|null
+     * } $filters
+     * @return array{items: array<int, array<string, mixed>>, total: int}
+     */
+    public function getPaginated(array $filters, int $page, int $perPage): array;
+
     public function markPaid(int $transactionId, int $bookingId, ?string $providerPaymentIntentId): bool;
 
     public function markFailed(int $transactionId, string $reason): bool;

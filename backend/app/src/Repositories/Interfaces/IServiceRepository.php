@@ -13,6 +13,21 @@ interface IServiceRepository
     /** @return ServiceModel[] */
     public function getAll(): array;
 
+    /**
+     * Admin action: Get all services with pagination and filters.
+     * @param array{
+     *   subject?: string,
+     *   tutor_id?: int|null,
+     *   is_active?: bool|null,
+     *   min_duration?: int|null,
+     *   max_duration?: int|null,
+     *   min_price?: float|null,
+     *   max_price?: float|null
+     * } $filters
+     * @return array{items: ServiceModel[], total: int}
+     */
+    public function getAllPaginated(array $filters, int $page, int $perPage): array;
+
     /** Student action: Get all active services*/
     /** @return ServiceModel[] */
     public function getAllActive(): array;

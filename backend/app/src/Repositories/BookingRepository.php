@@ -33,6 +33,116 @@ class BookingRepository implements IBookingRepository
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    
+    public function getAllPaginated(array $filters, int $page, int $perPage): array
+    {
+        $pdo = Database::getConnection();
+        $offset = ($page - 1) * $perPage;
+
+        $whereParts = ['1 = 1'];
+        $params = [];
+
+        $status = strtolower(trim((string)($filters['status'] ?? '')));
+        if ($status !== '') {
+            $whereParts[] = 'b.status = :status';
+            $params[':status'] = $status;
+        }
+
+        $scope = strtolower(trim((string)($filters['scope'] ?? '')));
+        if ($scope === 'upcoming') {
+            $whereParts[] = "b.status = 'paid'";
+            $whereParts[] = 't.start_time >= NOW()';
+        } elseif ($scope === 'history') {
+            $whereParts[] = "(t.start_time < NOW() OR b.status = 'cancelled')";
+        }
+
+        if (array_key_exists('student_id', $filters) && $filters['student_id'] !== null) {
+            $whereParts[] = 'b.student_id = :student_id';
+            $params[':student_id'] = (int)$filters['student_id'];
+        }
+
+        if (array_key_exists('tutor_id', $filters) && $filters['tutor_id'] !== null) {
+            $whereParts[] = 's.tutor_id = :tutor_id';
+            $params[':tutor_id'] = (int)$filters['tutor_id'];
+        }
+
+        if (array_key_exists('service_id', $filters) && $filters['service_id'] !== null) {
+            $whereParts[] = 's.id = :service_id';
+            $params[':service_id'] = (int)$filters['service_id'];
+        }
+
+        if (array_key_exists('date_from', $filters) && $filters['date_from'] !== null) {
+            $whereParts[] = 'DATE(t.start_time) >= :date_from';
+            $params[':date_from'] = (string)$filters['date_from'];
+        }
+
+        if (array_key_exists('date_to', $filters) && $filters['date_to'] !== null) {
+            $whereParts[] = 'DATE(t.start_time) <= :date_to';
+            $params[':date_to'] = (string)$filters['date_to'];
+        }
+
+        $whereSql = implode(' AND ', $whereParts);
+
+        $countStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            WHERE {$whereSql}
+        ");
+        foreach ($params as $key => $value) {
+            if (is_int($value)) {
+                $countStmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $countStmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $countStmt->execute();
+        $total = (int)$countStmt->fetchColumn();
+
+        $stmt = $pdo->prepare("
+            SELECT
+                b.id,
+                b.student_id,
+                b.timeslot_id,
+                b.status,
+                b.created_at,
+                b.price_at_booking,
+                t.start_time,
+                t.end_time,
+                s.id AS service_id,
+                s.title AS service_title,
+                s.tutor_id,
+                tutor.name AS tutor_name,
+                tutor.email AS tutor_email,
+                student.name AS student_name,
+                student.email AS student_email
+            FROM bookings b
+            JOIN timeslots t ON b.timeslot_id = t.id
+            JOIN services s ON t.service_id = s.id
+            JOIN users tutor ON s.tutor_id = tutor.id
+            JOIN users student ON b.student_id = student.id
+            WHERE {$whereSql}
+            ORDER BY t.start_time DESC, b.id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        foreach ($params as $key => $value) {
+            if (is_int($value)) {
+                $stmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($key, (string)$value, PDO::PARAM_STR);
+            }
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'items' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'total' => $total,
+        ];
+    }
+
     public function create(BookingModel $booking): int
     {
         $pdo = Database::getConnection();
@@ -511,3 +621,5 @@ class BookingRepository implements IBookingRepository
         return (int) $stmt->fetchColumn();
     }
 }
+
+
