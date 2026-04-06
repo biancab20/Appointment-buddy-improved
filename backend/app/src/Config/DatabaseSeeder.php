@@ -96,6 +96,13 @@ $insertUser->execute([
     ':role' => 'admin',
 ]);
 
+$insertUser->execute([
+    ':name' => 'Test Tutor',
+    ':email' => 'tutor@example.com',
+    ':password_hash' => password_hash('password', PASSWORD_DEFAULT),
+    ':role' => 'tutor',
+]);
+
 $insertService = $pdo->prepare("
     INSERT INTO services (title, description, duration_minutes, is_active)
     VALUES (:title, :description, :duration_minutes, :is_active)
