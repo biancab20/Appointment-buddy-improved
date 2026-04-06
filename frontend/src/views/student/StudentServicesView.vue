@@ -7,6 +7,8 @@ import type { ServiceItem, StudentServicesQuery } from '@/stores/services'
 import { useServicesStore } from '@/stores/services'
 import type { StudentTimeslot } from '@/stores/timeslots'
 import { useTimeslotsStore } from '@/stores/timeslots'
+import { dateKey, formatDate, formatTime } from '@/utils/dateTime'
+import { formatPrice } from '@/utils/number'
 
 interface ServiceTimeslotState {
   open: boolean
@@ -97,41 +99,6 @@ function ensureState(serviceId: number): ServiceTimeslotState {
   }
 
   return timeslotStates[serviceId]
-}
-
-function parseDateTime(value: string): Date {
-  const isoLike = value.includes('T') ? value : value.replace(' ', 'T')
-  return new Date(isoLike)
-}
-
-function formatDate(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date)
-}
-
-function formatTime(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(11, 16)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-}
-
-function dateKey(value: string): string {
-  return value.slice(0, 10)
 }
 
 function uniqueDateKeys(timeslots: StudentTimeslot[]): string[] {
@@ -533,7 +500,7 @@ onMounted(() => {
           </p>
           <p class="meta">
             Duration: <strong>{{ service.duration_minutes }} min</strong> |
-            Price: <strong>EUR {{ Number(service.price).toFixed(2) }}</strong>
+            Price: <strong>EUR {{ formatPrice(service.price) }}</strong>
           </p>
 
           <button type="button" class="toggle-btn" @click="toggleTimeslots(service.id)">

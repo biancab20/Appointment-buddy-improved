@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router'
 
 import type { TutorService, TutorServicePayload } from '@/stores/services'
 import { useServicesStore } from '@/stores/services'
+import { formatPrice } from '@/utils/number'
 
 const servicesStore = useServicesStore()
 const { tutorLoading, tutorServices } = storeToRefs(servicesStore)
@@ -205,7 +206,7 @@ onMounted(() => {
               <p v-if="service.description" class="desc">{{ service.description }}</p>
               <p class="meta">
                 Duration: <strong>{{ service.duration_minutes }}</strong> min |
-                Price: <strong>EUR {{ Number(service.price).toFixed(2) }}</strong>
+                Price: <strong>EUR {{ formatPrice(service.price) }}</strong>
               </p>
             </div>
 

@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from 'vue-router'
 
 import type { TutorTimeslot } from '@/stores/timeslots'
 import { useTimeslotsStore } from '@/stores/timeslots'
+import { formatDateTime, formatDateTimeFromDate, isPastOrNowDateTime, toInputDateTime } from '@/utils/dateTime'
 
 const route = useRoute()
 const serviceId = computed(() => Number(route.params.id ?? 0))
@@ -30,42 +31,6 @@ const editForm = reactive({
 
 function isActive(value: number | boolean): boolean {
   return value === 1 || value === true
-}
-
-function isPast(value: string): boolean {
-  const start = new Date(value.replace(' ', 'T'))
-  if (Number.isNaN(start.getTime())) {
-    return false
-  }
-
-  return start.getTime() <= Date.now()
-}
-
-function toInputDateTime(value: string): string {
-  const parsed = new Date(value.replace(' ', 'T'))
-  if (!Number.isNaN(parsed.getTime())) {
-    const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000)
-    return local.toISOString().slice(0, 16)
-  }
-
-  const fallback = value.trim().replace(' ', 'T')
-  return fallback.length >= 16 ? fallback.slice(0, 16) : ''
-}
-
-function formatHumanDateTime(value: string): string {
-  const parsed = new Date(value.replace(' ', 'T'))
-  if (!Number.isNaN(parsed.getTime())) {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(parsed)
-  }
-
-  return value
 }
 
 function resetCreateForm(): void {
@@ -156,17 +121,6 @@ onMounted(() => {
   void loadTimeslots()
 })
 
-function formatPreviewDateTime(value: Date): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(value)
-}
-
 function calculatedEndPreview(startValue: string): string {
   if (!service.value || !startValue) {
     return 'Select a start time'
@@ -183,7 +137,7 @@ function calculatedEndPreview(startValue: string): string {
   }
 
   const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
-  return formatPreviewDateTime(endDate)
+  return formatDateTimeFromDate(endDate)
 }
 </script>
 
@@ -241,11 +195,11 @@ function calculatedEndPreview(startValue: string): string {
             <div>
               <div class="title-row">
                 <h2>
-                  {{ formatHumanDateTime(timeslot.start_time) }} -> {{ formatHumanDateTime(timeslot.end_time) }}
+                  {{ formatDateTime(timeslot.start_time) }} -> {{ formatDateTime(timeslot.end_time) }}
                 </h2>
                 <span v-if="isActive(timeslot.is_active)" class="badge active">Active</span>
                 <span v-else class="badge inactive">Inactive</span>
-                <span v-if="isPast(timeslot.start_time)" class="badge neutral">Past</span>
+                <span v-if="isPastOrNowDateTime(timeslot.start_time)" class="badge neutral">Past</span>
               </div>
               <p class="meta">Timeslot ID: {{ timeslot.id }}</p>
             </div>
@@ -254,7 +208,7 @@ function calculatedEndPreview(startValue: string): string {
               <button
                 type="button"
                 class="ghost-btn"
-                :disabled="!service || !isActive(service.is_active) || isPast(timeslot.start_time)"
+                :disabled="!service || !isActive(service.is_active) || isPastOrNowDateTime(timeslot.start_time)"
                 @click="startEdit(timeslot)"
               >
                 Edit

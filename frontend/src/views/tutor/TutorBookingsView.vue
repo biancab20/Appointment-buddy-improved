@@ -9,6 +9,15 @@ import type {
   TutorBookingsQuery,
 } from '@/stores/tutorBookings'
 import { useTutorBookingsStore } from '@/stores/tutorBookings'
+import {
+  formatDate,
+  formatIsoDate,
+  formatMonthYear,
+  formatTime,
+  isIsoDate,
+  isPastDateTime,
+} from '@/utils/dateTime'
+import { formatPrice } from '@/utils/number'
 
 interface TutorFilters {
   dateFrom: string
@@ -40,12 +49,7 @@ const successMessage = ref('')
 const actionLoadingByBooking = reactive<Record<number, boolean>>({})
 const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
-const monthLabel = computed(() =>
-  new Intl.DateTimeFormat('en-GB', {
-    month: 'long',
-    year: 'numeric',
-  }).format(calendarMonth.value),
-)
+const monthLabel = computed(() => formatMonthYear(calendarMonth.value))
 
 const dateCountMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = {}
@@ -99,56 +103,12 @@ const calendarCells = computed<CalendarCell[]>(() => {
   return cells
 })
 
-function parseDateTime(value: string): Date {
-  const isoLike = value.includes('T') ? value : value.replace(' ', 'T')
-  return new Date(isoLike)
-}
-
-function formatDate(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date)
-}
-
-function formatTime(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(11, 16)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-}
-
-function formatPrice(value: number): string {
-  return Number(value).toFixed(2)
-}
-
-function isPast(value: string): boolean {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return false
-  }
-
-  return date.getTime() < Date.now()
-}
-
 function statusLabel(booking: TutorBooking): string {
   if (booking.status === 'cancelled') {
     return 'Cancelled'
   }
 
-  if (scope.value === 'history' && isPast(booking.start_time)) {
+  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
     return 'Completed'
   }
 
@@ -160,7 +120,7 @@ function statusClass(booking: TutorBooking): string {
     return 'status-cancelled'
   }
 
-  if (scope.value === 'history' && isPast(booking.start_time)) {
+  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
     return 'status-completed'
   }
 
@@ -168,7 +128,7 @@ function statusClass(booking: TutorBooking): string {
 }
 
 function canTutorCancel(booking: TutorBooking): boolean {
-  return scope.value === 'upcoming' && booking.status === 'paid' && !isPast(booking.start_time)
+  return scope.value === 'upcoming' && booking.status === 'paid' && !isPastDateTime(booking.start_time)
 }
 
 function isActionLoading(bookingId: number): boolean {
@@ -177,27 +137,6 @@ function isActionLoading(bookingId: number): boolean {
 
 function setActionLoading(bookingId: number, loadingState: boolean): void {
   actionLoadingByBooking[bookingId] = loadingState
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false
-  }
-
-  const year = Number(value.slice(0, 4))
-  const month = Number(value.slice(5, 7))
-  const day = Number(value.slice(8, 10))
-
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return false
-  }
-
-  const check = new Date(year, month - 1, day)
-  return (
-    check.getFullYear() === year &&
-    check.getMonth() === month - 1 &&
-    check.getDate() === day
-  )
 }
 
 function validateFilters(): string | null {
@@ -242,13 +181,6 @@ function buildQueryParams(page: number): TutorBookingsQuery {
   }
 
   return params
-}
-
-function formatIsoDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 async function loadCalendar(): Promise<void> {

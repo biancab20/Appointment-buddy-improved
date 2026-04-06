@@ -10,6 +10,8 @@ import type {
   StudentBookingsQuery,
 } from '@/stores/bookings'
 import { useBookingsStore } from '@/stores/bookings'
+import { dateKey, formatDate, formatTime, hoursUntil, isIsoDate, isPastDateTime } from '@/utils/dateTime'
+import { formatPrice } from '@/utils/number'
 
 interface BookingFilters {
   dateFrom: string
@@ -92,65 +94,12 @@ const resultsSummary = computed(() => {
   return `Showing ${start}-${end} of ${pagination.value.total} bookings`
 })
 
-function parseDateTime(value: string): Date {
-  const isoLike = value.includes('T') ? value : value.replace(' ', 'T')
-  return new Date(isoLike)
-}
-
-function formatDate(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date)
-}
-
-function formatTime(value: string): string {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(11, 16)
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-}
-
-function formatPrice(value: number): string {
-  return Number(value).toFixed(2)
-}
-
-function isPast(value: string): boolean {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return false
-  }
-
-  return date.getTime() < Date.now()
-}
-
-function hoursUntil(value: string): number {
-  const date = parseDateTime(value)
-  if (Number.isNaN(date.getTime())) {
-    return 0
-  }
-
-  return (date.getTime() - Date.now()) / 3600000
-}
-
 function statusLabel(booking: StudentBooking): string {
   if (booking.status === 'cancelled') {
     return 'Cancelled'
   }
 
-  if (scope.value === 'history' && isPast(booking.start_time)) {
+  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
     return 'Completed'
   }
 
@@ -162,7 +111,7 @@ function statusClass(booking: StudentBooking): string {
     return 'status-cancelled'
   }
 
-  if (scope.value === 'history' && isPast(booking.start_time)) {
+  if (scope.value === 'history' && isPastDateTime(booking.start_time)) {
     return 'status-completed'
   }
 
@@ -179,7 +128,7 @@ function policyHint(booking: StudentBooking): string {
 }
 
 function canManageBooking(booking: StudentBooking): boolean {
-  return scope.value === 'upcoming' && booking.status === 'paid' && !isPast(booking.start_time)
+  return scope.value === 'upcoming' && booking.status === 'paid' && !isPastDateTime(booking.start_time)
 }
 
 function isActionLoading(bookingId: number): boolean {
@@ -188,27 +137,6 @@ function isActionLoading(bookingId: number): boolean {
 
 function setActionLoading(bookingId: number, loading: boolean): void {
   actionLoadingByBooking[bookingId] = loading
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false
-  }
-
-  const year = Number(value.slice(0, 4))
-  const month = Number(value.slice(5, 7))
-  const day = Number(value.slice(8, 10))
-
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return false
-  }
-
-  const check = new Date(year, month - 1, day)
-  return (
-    check.getFullYear() === year &&
-    check.getMonth() === month - 1 &&
-    check.getDate() === day
-  )
 }
 
 function validateFilters(): string | null {
@@ -298,10 +226,6 @@ async function goToPage(page: number): Promise<void> {
   }
 
   await loadBookings(page)
-}
-
-function dateKey(value: string): string {
-  return value.slice(0, 10)
 }
 
 function uniqueDateKeys(timeslots: RescheduleOption[]): string[] {
