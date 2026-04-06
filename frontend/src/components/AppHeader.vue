@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed } from 'vue'
 
 import { storeToRefs } from 'pinia'
@@ -26,6 +26,16 @@ const authenticatedLinks = computed(() => {
       { label: 'Dashboard', to: { name: 'tutor-dashboard' } },
       { label: 'Services', to: { name: 'tutor-services' } },
       { label: 'Bookings', to: { name: 'tutor-bookings' } },
+    ]
+  }
+
+  if (role.value === 'admin') {
+    return [
+      { label: 'Dashboard', to: { name: 'admin-dashboard' } },
+      { label: 'Services', to: { name: 'admin-services' } },
+      { label: 'Bookings', to: { name: 'admin-bookings' } },
+      { label: 'Users', to: { name: 'admin-users' } },
+      { label: 'Transactions', to: { name: 'admin-transactions' } },
     ]
   }
 

@@ -98,7 +98,31 @@ const router = createRouter({
     {
       path: '/admin/dashboard',
       name: 'admin-dashboard',
-      component: () => import('../views/dashboards/AdminDashboardView.vue'),
+      component: () => import('../views/admin/AdminDashboardView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['admin'] },
+    },
+    {
+      path: '/admin/services',
+      name: 'admin-services',
+      component: () => import('../views/admin/AdminServicesView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['admin'] },
+    },
+    {
+      path: '/admin/bookings',
+      name: 'admin-bookings',
+      component: () => import('../views/admin/AdminBookingsView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['admin'] },
+    },
+    {
+      path: '/admin/users',
+      name: 'admin-users',
+      component: () => import('../views/admin/AdminUsersView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['admin'] },
+    },
+    {
+      path: '/admin/transactions',
+      name: 'admin-transactions',
+      component: () => import('../views/admin/AdminTransactionsView.vue'),
       meta: { requiresAuth: true, allowedRoles: ['admin'] },
     },
     {
