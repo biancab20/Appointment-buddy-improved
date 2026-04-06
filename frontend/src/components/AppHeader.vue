@@ -1,4 +1,6 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import { computed } from 'vue'
+
 import { storeToRefs } from 'pinia'
 import { RouterLink, useRouter } from 'vue-router'
 
@@ -8,7 +10,27 @@ import { useAuthStore } from '@/stores/auth'
 const authStore = useAuthStore()
 const router = useRouter()
 
-const { isAuthenticated } = storeToRefs(authStore)
+const { isAuthenticated, role } = storeToRefs(authStore)
+
+const authenticatedLinks = computed(() => {
+  if (role.value === 'student') {
+    return [
+      { label: 'Dashboard', to: { name: 'student-dashboard' } },
+      { label: 'Services', to: { name: 'student-services' } },
+      { label: 'Bookings', to: { name: 'student-bookings' } },
+    ]
+  }
+
+  if (role.value === 'tutor') {
+    return [
+      { label: 'Dashboard', to: { name: 'tutor-dashboard' } },
+      { label: 'Services', to: { name: 'tutor-services' } },
+      { label: 'Bookings', to: { name: 'tutor-bookings' } },
+    ]
+  }
+
+  return [{ label: 'Dashboard', to: { name: 'dashboard' } }]
+})
 
 async function logout(): Promise<void> {
   await authStore.logout()
@@ -31,7 +53,9 @@ async function logout(): Promise<void> {
       </template>
 
       <template v-else>
-        <RouterLink to="/dashboard">Dashboard</RouterLink>
+        <RouterLink v-for="link in authenticatedLinks" :key="link.label" :to="link.to">
+          {{ link.label }}
+        </RouterLink>
         <button type="button" class="logout-btn" @click="logout">Log out</button>
       </template>
     </nav>
