@@ -40,7 +40,7 @@ async function onSubmit(): Promise<void> {
     const data = response.data
     authStore.setSession(data.access_token, data.user.role)
 
-    await router.push({ name: 'home' })
+    await router.push('/dashboard')
   } catch (error: unknown) {
     if (axios.isAxiosError<{ error?: string }>(error)) {
       errorMessage.value = error.response?.data?.error ?? 'Login failed. Please try again.'

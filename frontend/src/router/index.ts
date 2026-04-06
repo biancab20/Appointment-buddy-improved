@@ -26,6 +26,52 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: HomeView,
+      beforeEnter: () => {
+        const authStore = useAuthStore()
+        const accessStore = useAccessStore()
+
+        if (!authStore.isAuthenticated) {
+          return { name: 'login' }
+        }
+
+        if (authStore.role === 'student') {
+          return { name: 'student-dashboard' }
+        }
+
+        if (authStore.role === 'tutor') {
+          return { name: 'tutor-dashboard' }
+        }
+
+        if (authStore.role === 'admin') {
+          return { name: 'admin-dashboard' }
+        }
+
+        accessStore.setError(403)
+        return false
+      },
+    },
+    {
+      path: '/student/dashboard',
+      name: 'student-dashboard',
+      component: () => import('../views/dashboards/StudentDashboardView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['student'] },
+    },
+    {
+      path: '/tutor/dashboard',
+      name: 'tutor-dashboard',
+      component: () => import('../views/dashboards/TutorDashboardView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['tutor'] },
+    },
+    {
+      path: '/admin/dashboard',
+      name: 'admin-dashboard',
+      component: () => import('../views/dashboards/AdminDashboardView.vue'),
+      meta: { requiresAuth: true, allowedRoles: ['admin'] },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/errors/Error404View.vue'),
@@ -41,7 +87,7 @@ router.beforeEach((to) => {
 
   const isGuestOnly = to.matched.some((record) => record.meta.guestOnly === true)
   if (isGuestOnly && authStore.isAuthenticated) {
-    return { name: 'home' }
+    return { name: 'dashboard' }
   }
 
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
