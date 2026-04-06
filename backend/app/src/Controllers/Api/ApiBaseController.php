@@ -81,6 +81,28 @@ abstract class ApiBaseController
         }
     }
 
+    protected function requireTutor(): void
+    {
+        $this->requireAuth();
+
+        $role = (string)($this->authUser['role'] ?? '');
+        if ($role !== UserModel::ROLE_TUTOR) {
+            $this->json(['error' => 'Forbidden'], 403);
+            exit;
+        }
+    }
+
+    protected function requireStudent(): void
+    {
+        $this->requireAuth();
+
+        $role = (string)($this->authUser['role'] ?? '');
+        if ($role !== UserModel::ROLE_STUDENT) {
+            $this->json(['error' => 'Forbidden'], 403);
+            exit;
+        }
+    }
+
     protected function authUserId(): int
     {
         return (int)($this->authUser['id'] ?? 0);

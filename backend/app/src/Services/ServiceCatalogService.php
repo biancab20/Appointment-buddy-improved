@@ -95,11 +95,20 @@ class ServiceCatalogService implements IServiceCatalogService
             throw new \RuntimeException("Service not found.");
         }
 
+        $title = trim($title);
+        if ($title === '') {
+            throw new \RuntimeException("Service title is required.");
+        }
+
+        if ($durationMinutes <= 0) {
+            throw new \RuntimeException("Duration must be greater than 0.");
+        }
+
         if ($price <= 0) {
             throw new \RuntimeException("Price must be greater than 0.");
         }
 
-        $service->title = trim($title);
+        $service->title = $title;
         $service->description = $description ? trim($description) : null;
         $service->durationMinutes = $durationMinutes;
         $service->price = $price;

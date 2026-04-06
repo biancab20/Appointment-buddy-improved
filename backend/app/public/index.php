@@ -28,8 +28,16 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('POST', '/auth/logout', ['App\\Controllers\\Api\\AuthApiController', 'logout']);
     $r->addRoute('GET', '/auth/me', ['App\\Controllers\\Api\\AuthApiController', 'currentUser']);
 
-    $r->addRoute('GET', '/api/services', ['App\\Controllers\\Api\\ServiceApiController', 'index']);
-    $r->addRoute('GET', '/api/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'timeslots']);
+    // Student service browsing
+    $r->addRoute('GET', '/api/student/services', ['App\\Controllers\\Api\\ServiceApiController', 'studentServices']);
+    $r->addRoute('GET', '/api/student/services/{id:\\d+}/timeslots', ['App\\Controllers\\Api\\ServiceApiController', 'studentTimeslots']);
+
+    // Tutor service CRUD (owned services only)
+    $r->addRoute('GET', '/api/tutor/services', ['App\\Controllers\\Api\\ServiceApiController', 'tutorServices']);
+    $r->addRoute('GET', '/api/tutor/services/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorService']);
+    $r->addRoute('POST', '/api/tutor/services', ['App\\Controllers\\Api\\ServiceApiController', 'tutorCreateService']);
+    $r->addRoute('PUT', '/api/tutor/services/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorUpdateService']);
+    $r->addRoute('DELETE', '/api/tutor/services/{id:\\d+}', ['App\\Controllers\\Api\\ServiceApiController', 'tutorDeleteService']);
 
     $r->addRoute('GET', '/api/admin/bookings/pending', ['App\\Controllers\\Api\\BookingApiController', 'pending']);
 });
