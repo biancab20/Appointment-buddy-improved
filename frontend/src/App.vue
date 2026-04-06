@@ -7,9 +7,17 @@ import Error401View from '@/views/errors/Error401View.vue'
 import Error403View from '@/views/errors/Error403View.vue'
 
 import { useAccessStore } from './stores/access'
+import { useAuthStore } from './stores/auth'
 
 const accessStore = useAccessStore()
+const authStore = useAuthStore()
+
 const { errorCode } = storeToRefs(accessStore)
+const { isAuthenticated, role } = storeToRefs(authStore)
+
+function logout(): void {
+  authStore.clearSession()
+}
 </script>
 
 <template>
@@ -22,7 +30,11 @@ const { errorCode } = storeToRefs(accessStore)
 
       <nav class="app-nav">
         <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+        <RouterLink v-if="!isAuthenticated" to="/login">Log in</RouterLink>
+        <RouterLink v-if="!isAuthenticated" to="/signup">Sign up</RouterLink>
+        <button v-if="isAuthenticated" type="button" class="logout-btn" @click="logout">
+          Log out ({{ role }})
+        </button>
       </nav>
     </header>
 
@@ -73,6 +85,7 @@ const { errorCode } = storeToRefs(accessStore)
 }
 
 .app-nav {
+  align-items: center;
   display: flex;
   gap: 0.45rem;
 }
@@ -95,6 +108,20 @@ const { errorCode } = storeToRefs(accessStore)
 .app-nav a.router-link-exact-active {
   background: #0f3341;
   color: #fff;
+}
+
+.logout-btn {
+  background: rgba(15, 51, 65, 0.1);
+  border: none;
+  border-radius: 999px;
+  color: #0f3341;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.4rem 0.85rem;
+}
+
+.logout-btn:hover {
+  background: rgba(15, 51, 65, 0.16);
 }
 
 .app-footer {

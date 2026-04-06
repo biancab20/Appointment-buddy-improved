@@ -47,8 +47,8 @@ const featureCards = [
         </p>
 
         <div class="hero-actions">
-          <RouterLink to="/about" class="btn btn-primary">Book now</RouterLink>
-          <a href="#benefits" class="btn btn-ghost">Why Appointment Buddy</a>
+          <RouterLink to="/signup" class="btn btn-primary">Book now</RouterLink>
+          <RouterLink to="/login" class="btn btn-ghost">Log in</RouterLink>
         </div>
       </div>
     </section>

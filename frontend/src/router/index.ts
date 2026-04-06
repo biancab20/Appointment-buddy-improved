@@ -14,9 +14,16 @@ const router = createRouter({
       component: HomeView,
     },
     {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue'),
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/signup',
+      name: 'signup',
+      component: () => import('../views/SignupView.vue'),
+      meta: { guestOnly: true },
     },
     {
       path: '/:pathMatch(.*)*',
@@ -30,12 +37,18 @@ router.beforeEach((to) => {
   const accessStore = useAccessStore()
   accessStore.clearError()
 
+  const authStore = useAuthStore()
+
+  const isGuestOnly = to.matched.some((record) => record.meta.guestOnly === true)
+  if (isGuestOnly && authStore.isAuthenticated) {
+    return { name: 'home' }
+  }
+
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
   if (!requiresAuth) {
     return true
   }
 
-  const authStore = useAuthStore()
   if (!authStore.isAuthenticated) {
     accessStore.setError(401)
     return false
