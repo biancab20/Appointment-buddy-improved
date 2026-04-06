@@ -3,6 +3,8 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
 import type { TutorService, TutorServicePayload } from '@/stores/services'
 import { useServicesStore } from '@/stores/services'
 import { formatPrice } from '@/utils/number'
@@ -140,18 +142,16 @@ onMounted(() => {
 
 <template>
   <main class="page-shell">
-    <section class="heading-row">
-      <div>
-        <h1>Services</h1>
-        <p class="subtitle">Manage your tutoring services and their timeslots.</p>
-      </div>
-      <RouterLink to="/tutor/dashboard" class="back-btn">Back</RouterLink>
-    </section>
+    <PageHeader
+      title="Services"
+      subtitle="Manage your tutoring services and their timeslots."
+      back-to="/tutor/dashboard"
+    />
 
     <p class="summary">You have {{ activeServicesCount }} active service(s).</p>
 
-    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="feedback success">{{ successMessage }}</p>
+    <FeedbackMessage v-if="errorMessage" :message="errorMessage" type="error" />
+    <FeedbackMessage v-if="successMessage" :message="successMessage" type="success" />
 
     <section class="create-wrap">
       <button type="button" class="primary-btn" @click="showCreateForm = !showCreateForm">

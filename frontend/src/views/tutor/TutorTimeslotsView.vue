@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 
+import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
 import type { TutorTimeslot } from '@/stores/timeslots'
 import { useTimeslotsStore } from '@/stores/timeslots'
 import { formatDateTime, formatDateTimeFromDate, isPastOrNowDateTime, toInputDateTime } from '@/utils/dateTime'
@@ -143,19 +145,15 @@ function calculatedEndPreview(startValue: string): string {
 
 <template>
   <main class="page-shell">
-    <section class="heading-row">
-      <div>
-        <h1>Timeslots</h1>
-        <p class="subtitle">
-          Service:
-          <strong>{{ service?.title ?? '...' }}</strong>
-        </p>
-      </div>
-      <RouterLink to="/tutor/services" class="back-btn">Back to services</RouterLink>
-    </section>
+    <PageHeader
+      title="Timeslots"
+      :subtitle="`Service: ${service?.title ?? '...'}`"
+      back-to="/tutor/services"
+      back-label="Back to services"
+    />
 
-    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="feedback success">{{ successMessage }}</p>
+    <FeedbackMessage v-if="errorMessage" :message="errorMessage" type="error" />
+    <FeedbackMessage v-if="successMessage" :message="successMessage" type="success" />
 
     <p v-if="service && !isActive(service.is_active)" class="feedback warning">
       This service is inactive. You cannot add or edit timeslots.

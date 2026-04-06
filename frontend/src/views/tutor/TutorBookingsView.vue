@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 
+import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import PaginationControls from '@/components/common/PaginationControls.vue'
+import ScopeTabs from '@/components/common/ScopeTabs.vue'
 import type {
   TutorBooking,
   TutorBookingScope,
@@ -218,6 +221,10 @@ async function switchScope(nextScope: TutorBookingScope): Promise<void> {
   await loadAll(1)
 }
 
+function onScopeTabChange(value: string): void {
+  void switchScope(value as TutorBookingScope)
+}
+
 async function applyFilters(): Promise<void> {
   const validationError = validateFilters()
   if (validationError) {
@@ -292,34 +299,12 @@ onMounted(() => {
 
 <template>
   <main class="page-shell">
-    <section class="heading-row">
-      <div>
-        <h1>Tutor Bookings</h1>
-      </div>
-      <RouterLink to="/tutor/dashboard" class="back-btn">Back</RouterLink>
-    </section>
+    <PageHeader title="Tutor Bookings" back-to="/tutor/dashboard" />
 
-    <p v-if="successMessage" class="feedback success">{{ successMessage }}</p>
-    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
+    <FeedbackMessage v-if="successMessage" :message="successMessage" type="success" />
+    <FeedbackMessage v-if="errorMessage" :message="errorMessage" type="error" />
 
-    <section class="tabs-row">
-      <button
-        type="button"
-        class="tab-btn"
-        :class="{ active: scope === 'upcoming' }"
-        @click="switchScope('upcoming')"
-      >
-        Upcoming
-      </button>
-      <button
-        type="button"
-        class="tab-btn"
-        :class="{ active: scope === 'history' }"
-        @click="switchScope('history')"
-      >
-        History
-      </button>
-    </section>
+    <ScopeTabs :model-value="scope" :disabled="loading" @update:model-value="onScopeTabChange" />
 
     <section class="panel filters-panel">
       <form class="filters-form" @submit.prevent="applyFilters">
@@ -436,41 +421,14 @@ onMounted(() => {
             </p>
           </section>
 
-          <nav v-if="pagination.total_pages > 1" class="pager">
-            <button
-              type="button"
-              class="pager-btn"
-              :disabled="!pagination.has_prev"
-              @click="goToPage(1)"
-            >
-              First
-            </button>
-            <button
-              type="button"
-              class="pager-btn"
-              :disabled="!pagination.has_prev"
-              @click="goToPage(pagination.page - 1)"
-            >
-              Previous
-            </button>
-            <span class="pager-info">Page {{ pagination.page }} / {{ pagination.total_pages }}</span>
-            <button
-              type="button"
-              class="pager-btn"
-              :disabled="!pagination.has_next"
-              @click="goToPage(pagination.page + 1)"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              class="pager-btn"
-              :disabled="!pagination.has_next"
-              @click="goToPage(pagination.total_pages)"
-            >
-              Last
-            </button>
-          </nav>
+          <PaginationControls
+            :page="pagination.page"
+            :total-pages="pagination.total_pages"
+            :has-prev="pagination.has_prev"
+            :has-next="pagination.has_next"
+            :disabled="loading"
+            @go="goToPage"
+          />
         </template>
       </article>
     </section>

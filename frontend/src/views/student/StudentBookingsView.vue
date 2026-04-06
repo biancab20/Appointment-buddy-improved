@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 
+import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import PaginationControls from '@/components/common/PaginationControls.vue'
+import ScopeTabs from '@/components/common/ScopeTabs.vue'
 import type {
   BookingScope,
   RescheduleOption,
@@ -203,6 +207,10 @@ async function switchScope(nextScope: BookingScope): Promise<void> {
   await loadBookings(1)
 }
 
+function onScopeTabChange(value: string): void {
+  void switchScope(value as BookingScope)
+}
+
 async function applyFilters(): Promise<void> {
   const validationError = validateFilters()
   if (validationError) {
@@ -368,36 +376,17 @@ onMounted(() => {
 
 <template>
   <main class="page-shell">
-    <section class="heading-row">
-      <div>
-        <h1>My Bookings</h1>
-        <p class="subtitle">Review your upcoming sessions and booking history.</p>
-      </div>
-      <RouterLink to="/student/dashboard" class="back-btn">Back</RouterLink>
-    </section>
+    <PageHeader
+      title="My Bookings"
+      subtitle="Review your upcoming sessions and booking history."
+      back-to="/student/dashboard"
+    />
 
-    <p v-if="paymentMessage" class="feedback success">{{ paymentMessage }}</p>
-    <p v-if="successMessage" class="feedback success">{{ successMessage }}</p>
-    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
+    <FeedbackMessage v-if="paymentMessage" :message="paymentMessage" type="success" />
+    <FeedbackMessage v-if="successMessage" :message="successMessage" type="success" />
+    <FeedbackMessage v-if="errorMessage" :message="errorMessage" type="error" />
 
-    <section class="tabs-row">
-      <button
-        type="button"
-        class="tab-btn"
-        :class="{ active: scope === 'upcoming' }"
-        @click="switchScope('upcoming')"
-      >
-        Upcoming
-      </button>
-      <button
-        type="button"
-        class="tab-btn"
-        :class="{ active: scope === 'history' }"
-        @click="switchScope('history')"
-      >
-        History
-      </button>
-    </section>
+    <ScopeTabs :model-value="scope" :disabled="isLoading" @update:model-value="onScopeTabChange" />
 
     <section class="panel filters-panel">
       <form class="filters-form" @submit.prevent="applyFilters">
@@ -433,43 +422,14 @@ onMounted(() => {
     <template v-else>
       <p class="results-summary">{{ resultsSummary }}</p>
 
-      <nav v-if="pagination.totalPages > 1" class="pager">
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasPrev"
-          @click="goToPage(1)"
-        >
-          First
-        </button>
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasPrev"
-          @click="goToPage(pagination.page - 1)"
-        >
-          Previous
-        </button>
-
-        <span class="pager-info">Page {{ pagination.page }} / {{ pagination.totalPages }}</span>
-
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasNext"
-          @click="goToPage(pagination.page + 1)"
-        >
-          Next
-        </button>
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasNext"
-          @click="goToPage(pagination.totalPages)"
-        >
-          Last
-        </button>
-      </nav>
+      <PaginationControls
+        :page="pagination.page"
+        :total-pages="pagination.totalPages"
+        :has-prev="pagination.hasPrev"
+        :has-next="pagination.hasNext"
+        :disabled="isLoading"
+        @go="goToPage"
+      />
 
       <section class="booking-list">
         <article v-for="booking in bookings" :key="booking.id" class="booking-card">

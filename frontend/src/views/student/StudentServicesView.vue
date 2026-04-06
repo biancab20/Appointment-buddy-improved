@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 
+import FeedbackMessage from '@/components/common/FeedbackMessage.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import PaginationControls from '@/components/common/PaginationControls.vue'
 import type { ServiceItem, StudentServicesQuery } from '@/stores/services'
 import { useServicesStore } from '@/stores/services'
 import type { StudentTimeslot } from '@/stores/timeslots'
@@ -368,13 +370,11 @@ onMounted(() => {
 
 <template>
   <main class="page-shell">
-    <section class="heading-row">
-      <div>
-        <h1>Available Services</h1>
-        <p class="subtitle">Choose a service and check its available timeslots.</p>
-      </div>
-      <RouterLink to="/student/dashboard" class="back-btn">Back</RouterLink>
-    </section>
+    <PageHeader
+      title="Available Services"
+      subtitle="Choose a service and check its available timeslots."
+      back-to="/student/dashboard"
+    />
 
     <section class="controls-row">
       <button type="button" class="primary-btn" @click="openFiltersModal">Filters</button>
@@ -445,49 +445,20 @@ onMounted(() => {
       </section>
     </div>
 
-    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
+    <FeedbackMessage v-if="errorMessage" :message="errorMessage" type="error" />
     <p v-if="isLoading" class="muted">Loading services...</p>
 
     <template v-else>
       <p class="results-summary">{{ resultsSummary }}</p>
 
-      <nav v-if="pagination.totalPages > 1" class="pager">
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasPrev"
-          @click="goToPage(1)"
-        >
-          First
-        </button>
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasPrev"
-          @click="goToPage(pagination.page - 1)"
-        >
-          Previous
-        </button>
-
-        <span class="pager-info">Page {{ pagination.page }} / {{ pagination.totalPages }}</span>
-
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasNext"
-          @click="goToPage(pagination.page + 1)"
-        >
-          Next
-        </button>
-        <button
-          type="button"
-          class="pager-btn"
-          :disabled="!pagination.hasNext"
-          @click="goToPage(pagination.totalPages)"
-        >
-          Last
-        </button>
-      </nav>
+      <PaginationControls
+        :page="pagination.page"
+        :total-pages="pagination.totalPages"
+        :has-prev="pagination.hasPrev"
+        :has-next="pagination.hasNext"
+        :disabled="isLoading"
+        @go="goToPage"
+      />
 
       <section class="service-list">
         <article v-for="service in services" :key="service.id" class="service-card">
