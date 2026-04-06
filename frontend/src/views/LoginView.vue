@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 
 interface LoginResponse {
   access_token: string
+  refresh_token: string
   user: {
     role: 'admin' | 'tutor' | 'student'
   }
@@ -38,7 +39,7 @@ async function onSubmit(): Promise<void> {
     })
 
     const data = response.data
-    authStore.setSession(data.access_token, data.user.role)
+    authStore.setSession(data.access_token, data.user.role, data.refresh_token ?? null)
 
     await router.push('/dashboard')
   } catch (error: unknown) {

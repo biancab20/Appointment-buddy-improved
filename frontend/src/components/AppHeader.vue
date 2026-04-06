@@ -11,7 +11,7 @@ const router = useRouter()
 const { isAuthenticated } = storeToRefs(authStore)
 
 async function logout(): Promise<void> {
-  authStore.clearSession()
+  await authStore.logout()
   await router.push({ name: 'home' })
 }
 </script>

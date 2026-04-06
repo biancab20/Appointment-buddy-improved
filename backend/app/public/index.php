@@ -24,6 +24,7 @@ $dispatcher = simpleDispatcher(function (RouteCollector $r) {
     $r->addRoute('GET', '/api/health', ['App\\Controllers\\Api\\HealthApiController', 'index']);
     $r->addRoute('POST', '/auth/login', ['App\\Controllers\\Api\\AuthApiController', 'login']);
     $r->addRoute('POST', '/auth/refresh', ['App\\Controllers\\Api\\AuthApiController', 'refresh']);
+    $r->addRoute('POST', '/auth/logout', ['App\\Controllers\\Api\\AuthApiController', 'logout']);
     $r->addRoute('GET', '/auth/me', ['App\\Controllers\\Api\\AuthApiController', 'currentUser']);
 
     $r->addRoute('GET', '/api/services', ['App\\Controllers\\Api\\ServiceApiController', 'index']);

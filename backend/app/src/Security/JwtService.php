@@ -168,4 +168,62 @@ class JwtService
             'refresh_token' => $newRefreshToken,
         ];
     }
+
+    public function revokeRefreshToken(string $refreshToken, ?int $expectedUserId = null): bool
+    {
+        $refreshToken = trim($refreshToken);
+        if ($refreshToken === '') {
+            return false;
+        }
+
+        $tokenHash = hash('sha256', $refreshToken);
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare("
+            SELECT id, user_id, revoked_at
+            FROM refresh_tokens
+            WHERE token_hash = :token_hash
+            LIMIT 1
+        ");
+        $stmt->execute([':token_hash' => $tokenHash]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return false;
+        }
+
+        if ($expectedUserId !== null && (int) $row['user_id'] !== $expectedUserId) {
+            return false;
+        }
+
+        if (!empty($row['revoked_at'])) {
+            return true;
+        }
+
+        $update = $pdo->prepare("
+            UPDATE refresh_tokens
+            SET revoked_at = NOW()
+            WHERE id = :id AND revoked_at IS NULL
+        ");
+        $update->execute([':id' => (int) $row['id']]);
+
+        return $update->rowCount() > 0;
+    }
+
+    public function revokeAllRefreshTokensForUser(int $userId): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare("
+            UPDATE refresh_tokens
+            SET revoked_at = NOW()
+            WHERE user_id = :user_id AND revoked_at IS NULL
+        ");
+        $stmt->execute([':user_id' => $userId]);
+
+        return $stmt->rowCount();
+    }
 }

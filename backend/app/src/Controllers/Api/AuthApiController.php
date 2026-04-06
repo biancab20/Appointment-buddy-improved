@@ -84,6 +84,24 @@ class AuthApiController extends ApiBaseController
         }
     }
 
+    public function logout(): void
+    {
+        $this->requireAuth();
+
+        $payload = $this->readJsonBody();
+        $refreshToken = trim((string)($payload['refresh_token'] ?? ''));
+
+        if ($refreshToken !== '') {
+            $this->jwtService->revokeRefreshToken($refreshToken, $this->authUserId());
+        } else {
+            $this->jwtService->revokeAllRefreshTokensForUser($this->authUserId());
+        }
+
+        $this->json([
+            'message' => 'Logged out successfully.',
+        ]);
+    }
+
     public function currentUser(): void
     {
         $this->requireAuth();
